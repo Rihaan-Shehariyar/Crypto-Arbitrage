@@ -296,7 +296,7 @@ export default function Register() {
 
         logo_alignment="left"
 
-        width="320"
+        width="320" 
 
         onSuccess={async (
           credentialResponse,
