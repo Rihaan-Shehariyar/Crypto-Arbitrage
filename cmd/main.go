@@ -59,19 +59,23 @@ func main() {
 			return
 		}
 
-		var action string
-		var profit float64
-
 		profit1 := kucoinBid - binanceAsk
+		fee1 := (binanceAsk * 0.001) + (kucoinBid * 0.001)
+		realProfit1 := profit1 - fee1
 
 		profit2 := binanceBid - kucoinAsk
+		fee2 := (kucoinAsk * 0.001) + (binanceBid * 0.001)
+		realProfit2 := profit2 - fee2
 
-		if profit1 > profit2 {
-			profit = profit1
-			action = "Buy Binance (ASK) → Sell KuCoin (BID)"
+		var action string
+		var realProfit float64
+
+		if realProfit1 > realProfit2 {
+			action = "Buy Binance → Sell KuCoin"
+			realProfit = realProfit1
 		} else {
-			profit = profit2
-			action = "Buy KuCoin (ASK) → Sell Binance (BID)"
+			action = "Buy KuCoin → Sell Binance"
+			realProfit = realProfit2
 		}
 
 		ctx.JSON(200, gin.H{
@@ -79,7 +83,7 @@ func main() {
 			"binance_ask": binanceAsk,
 			"kucoin_bid":  kucoinBid,
 			"kucoin_ask":  kucoinAsk,
-			"profit":      profit,
+			"real_profit": realProfit,
 			"action":      action,
 		})
 
