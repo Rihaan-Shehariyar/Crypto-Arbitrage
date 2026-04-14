@@ -10,7 +10,7 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/price/binance", func(ctx *gin.Context) {
-		price, err := exchange.GetBTCPrice()
+		binanceBid, binanceAsk, err := exchange.GetBinanceBTCPrice()
 
 		if err != nil {
 			ctx.JSON(500, gin.H{
@@ -20,13 +20,13 @@ func main() {
 		}
 
 		ctx.JSON(200, gin.H{
-			"price": price,
+			"Ask Price": binanceAsk,
+			"Bid Price": binanceBid,
 		})
 
 	})
 	r.GET("/price/kuCoin", func(ctx *gin.Context) {
-		price, err := exchange.GetKucoinBTCPrice()
-
+		kucoinBid, kucoinAsk, err := exchange.GetKuCoinBTCPrice()
 		if err != nil {
 			ctx.JSON(500, gin.H{
 				"Err": err.Error(),
@@ -35,25 +35,26 @@ func main() {
 		}
 
 		ctx.JSON(200, gin.H{
-			"price": price,
+			"Ask Price": kucoinAsk,
+			"Bid Price": kucoinBid,
 		})
 
 	})
 
 	r.GET("/compare", func(ctx *gin.Context) {
 
-		binancePrice, err := exchange.GetBTCPrice()
+		binanceBid, binanceAsk, err := exchange.GetBinanceBTCPrice()
 		if err != nil {
 			ctx.JSON(500, gin.H{
-				"error": err,
+				"error": err.Error(),
 			})
 			return
 		}
 
-		kuCoinPrice, err := exchange.GetKucoinBTCPrice()
+		kucoinBid, kucoinAsk, err := exchange.GetKuCoinBTCPrice()
 		if err != nil {
 			ctx.JSON(500, gin.H{
-				"error": err,
+				"error": err.Error(),
 			})
 			return
 		}
@@ -61,19 +62,25 @@ func main() {
 		var action string
 		var profit float64
 
-		if binancePrice < kuCoinPrice {
-			profit = kuCoinPrice - binancePrice
-			action = "Buy Binance → Sell KuCoin"
+		profit1 := kucoinBid - binanceAsk
+
+		profit2 := binanceBid - kucoinAsk
+
+		if profit1 > profit2 {
+			profit = profit1
+			action = "Buy Binance (ASK) → Sell KuCoin (BID)"
 		} else {
-			profit = binancePrice - kuCoinPrice
-			action = "Buy KuCoin → Sell Binance"
+			profit = profit2
+			action = "Buy KuCoin (ASK) → Sell Binance (BID)"
 		}
 
 		ctx.JSON(200, gin.H{
-			"binance": binancePrice,
-			"kuCoin":  kuCoinPrice,
-			"profit":  profit,
-			"action":  action,
+			"binance_bid": binanceBid,
+			"binance_ask": binanceAsk,
+			"kucoin_bid":  kucoinBid,
+			"kucoin_ask":  kucoinAsk,
+			"profit":      profit,
+			"action":      action,
 		})
 
 	})

@@ -9,22 +9,23 @@ import (
 
 type KucoinResponse struct {
 	Data struct {
-		Price string `json:"price"`
+		BestBid string `json:"bestBid"`
+		BestAsk string `json:"bestAsk"`
 	} `json:"data"`
 }
 
-func GetKucoinBTCPrice() (float64, error) {
+func GetKuCoinBTCPrice() (float64, float64, error) {
 
 	resp, err := http.Get("https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=BTC-USDT")
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	var data KucoinResponse
@@ -32,14 +33,19 @@ func GetKucoinBTCPrice() (float64, error) {
 	err = json.Unmarshal(body, &data)
 
 	if err != nil {
-		return 0, nil
+		return 0, 0, nil
 	}
 
-	price, err := strconv.ParseFloat(data.Data.Price, 64)
+	bid, err := strconv.ParseFloat(data.Data.BestBid, 64)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	return price, nil
+	ask, err := strconv.ParseFloat(data.Data.BestAsk, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return bid, ask, nil
 
 }
