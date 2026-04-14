@@ -11,7 +11,7 @@ type BinanceResponse struct {
 	Price string `json:"price"`
 }
 
-func GetBTCprice() (float64, error) {
+func GetBTCPrice() (float64, error) {
 	resp, err := http.Get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
 	if err != nil {
 		return 0, err

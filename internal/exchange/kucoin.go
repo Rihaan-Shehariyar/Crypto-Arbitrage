@@ -13,7 +13,7 @@ type KucoinResponse struct {
 	} `json:"data"`
 }
 
-func GetKucoinBTCProce() (float64, error) {
+func GetKucoinBTCPrice() (float64, error) {
 
 	resp, err := http.Get("https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=BTC-USDT")
 	if err != nil {
