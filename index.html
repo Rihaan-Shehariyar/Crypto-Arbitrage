@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Crypto Arbitrage Dashboard</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            margin: 20px auto;
+            width: 300px;
+            border-radius: 10px;
+        }
+
+        .profit {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .green { color: #22c55e; }
+        .red { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<h1> Crypto Arbitrage</h1>
+
+<div class="card">
+    <h3>Binance</h3>
+    <p>Bid: <span id="binance_bid"></span></p>
+    <p>Ask: <span id="binance_ask"></span></p>
+</div>
+
+<div class="card">
+    <h3>KuCoin</h3>
+    <p>Bid: <span id="kucoin_bid"></span></p>
+    <p>Ask: <span id="kucoin_ask"></span></p>
+</div>
+
+<div class="card">
+    <h3>Result</h3>
+    <p id="profit" class="profit"></p>
+    <p id="action"></p>
+</div>
+
+<script>
+const ws = new WebSocket("ws://localhost:8080/ws");
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    document.getElementById("binance_bid").innerText = data.binance_bid;
+    document.getElementById("binance_ask").innerText = data.binance_ask;
+
+    document.getElementById("kucoin_bid").innerText = data.kucoin_bid;
+    document.getElementById("kucoin_ask").innerText = data.kucoin_ask;
+
+    const profitEl = document.getElementById("profit");
+
+    profitEl.innerText = "Profit: " + data.real_profit;
+
+    if (data.real_profit > 0) {
+        profitEl.className = "profit green";
+    } else {
+        profitEl.className = "profit red";
+    }
+
+    document.getElementById("action").innerText = data.action;
+};
+</script>
+
+</body>
+</html>
