@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto-arbitrage/internal/exchange"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -69,24 +70,39 @@ func main() {
 
 		var action string
 		var realProfit float64
+		threshold := 50.0
 
 		if realProfit1 > realProfit2 {
-			action = "Buy Binance → Sell KuCoin"
 			realProfit = realProfit1
+			if realProfit >= threshold {
+				action = "Buy Binance → Sell KuCoin"
+			}
 		} else {
-			action = "Buy KuCoin → Sell Binance"
 			realProfit = realProfit2
+			if realProfit >= threshold {
+				action = "Buy KuCoin → Sell Binance"
+			}
 		}
 
-		ctx.JSON(200, gin.H{
+		if realProfit < threshold {
+			action = "No profitable arbitrage"
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
 			"binance_bid": binanceBid,
 			"binance_ask": binanceAsk,
 			"kucoin_bid":  kucoinBid,
 			"kucoin_ask":  kucoinAsk,
+
+			"profit_case1": profit1,
+			"profit_case2": profit2,
+			"fee_case1":    fee1,
+			"fee_case2":    fee2,
+
 			"real_profit": realProfit,
+			"threshold":   threshold,
 			"action":      action,
 		})
-
 	})
 
 	r.Run(":8080")
