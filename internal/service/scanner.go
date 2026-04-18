@@ -59,7 +59,7 @@ func StartScanner() {
 
 			LatestResult = map[string]interface{}{
 				"opportunities": results,
-				"timestamp":    time.Now(),
+				"timestamp":     time.Now(),
 			}
 			websocket.Broadcast(LatestResult)
 
