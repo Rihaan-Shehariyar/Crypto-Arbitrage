@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type KucoinResponse struct {
@@ -14,9 +15,15 @@ type KucoinResponse struct {
 	} `json:"data"`
 }
 
-func GetKuCoinBTCPrice() (float64, float64, error) {
+func formatKucoinSymbol(symbol string) string {
+	return strings.Replace(symbol, "USDT", "-USDT", 1)
+}
 
-	resp, err := http.Get("https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=BTC-USDT")
+func GetKuCoinPrice(symbol string) (float64, float64, error) {
+
+	kucoinSymbol := formatKucoinSymbol(symbol)
+	url := "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=" + kucoinSymbol
+	resp, err := http.Get(url)
 	if err != nil {
 		return 0, 0, err
 	}

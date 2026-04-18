@@ -9,7 +9,13 @@ import (
 )
 
 func GetBinancePrice(ctx *gin.Context) {
-	bid, ask, err := exchange.GetBinanceBTCPrice()
+
+	symbol := ctx.Query("symbol")
+	if symbol == "" {
+		symbol = "BTCUSDT"
+	}
+
+	bid, ask, err := exchange.GetBinancePrice(symbol)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err.Error(),
@@ -24,7 +30,13 @@ func GetBinancePrice(ctx *gin.Context) {
 }
 
 func GetKucoinPrice(ctx *gin.Context) {
-	bid, ask, err := exchange.GetKuCoinBTCPrice()
+
+	symbol := ctx.Query("symbol")
+	if symbol == "" {
+		symbol = "BTCUSDT"
+	}
+
+	bid, ask, err := exchange.GetKuCoinPrice(symbol)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

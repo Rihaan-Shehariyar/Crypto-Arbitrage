@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Crypto Arbitrage Dashboard</title>
+
     <style>
         body {
             font-family: Arial;
@@ -10,44 +11,58 @@
             text-align: center;
         }
 
+        h1 {
+            margin-top: 20px;
+        }
+
+        #container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
         .card {
             background: #1e293b;
             padding: 20px;
-            margin: 20px auto;
-            width: 300px;
+            margin: 15px;
+            width: 260px;
             border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .coin {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .section {
+            margin-top: 10px;
+            font-size: 14px;
         }
 
         .profit {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
+            margin-top: 10px;
         }
 
         .green { color: #22c55e; }
         .red { color: #ef4444; }
+        .neutral { color: #94a3b8; }
+
+        .action {
+            margin-top: 5px;
+            font-size: 13px;
+        }
     </style>
 </head>
+
 <body>
 
-<h1> Crypto Arbitrage</h1>
+<h1>🚀 Crypto Arbitrage Dashboard</h1>
 
-<div class="card">
-    <h3>Binance</h3>
-    <p>Bid: <span id="binance_bid"></span></p>
-    <p>Ask: <span id="binance_ask"></span></p>
-</div>
-
-<div class="card">
-    <h3>KuCoin</h3>
-    <p>Bid: <span id="kucoin_bid"></span></p>
-    <p>Ask: <span id="kucoin_ask"></span></p>
-</div>
-
-<div class="card">
-    <h3>Result</h3>
-    <p id="profit" class="profit"></p>
-    <p id="action"></p>
-</div>
+<div id="container"></div>
 
 <script>
 const ws = new WebSocket("ws://localhost:8080/ws");
@@ -55,23 +70,56 @@ const ws = new WebSocket("ws://localhost:8080/ws");
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
 
-    document.getElementById("binance_bid").innerText = data.binance_bid;
-    document.getElementById("binance_ask").innerText = data.binance_ask;
+    const container = document.getElementById("container");
+    container.innerHTML = "";
 
-    document.getElementById("kucoin_bid").innerText = data.kucoin_bid;
-    document.getElementById("kucoin_ask").innerText = data.kucoin_ask;
+    for (const coin in data) {
+        const item = data[coin];
 
-    const profitEl = document.getElementById("profit");
+        let profitClass = "neutral";
 
-    profitEl.innerText = "Profit: " + data.real_profit;
+        if (item.real_profit > 0) {
+            profitClass = "green";
+        } else if (item.real_profit < 0) {
+            profitClass = "red";
+        }
 
-    if (data.real_profit > 0) {
-        profitEl.className = "profit green";
-    } else {
-        profitEl.className = "profit red";
+        const card = `
+            <div class="card">
+                <div class="coin">${coin}</div>
+
+                <div class="section">
+                    <b>Binance</b><br>
+                    Bid: ${item.binance_bid}<br>
+                    Ask: ${item.binance_ask}
+                </div>
+
+                <div class="section">
+                    <b>KuCoin</b><br>
+                    Bid: ${item.kucoin_bid}<br>
+                    Ask: ${item.kucoin_ask}
+                </div>
+
+                <div class="profit ${profitClass}">
+                    Profit: ${item.real_profit.toFixed(2)}
+                </div>
+
+                <div class="action">
+                    ${item.action}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML += card;
     }
+};
 
-    document.getElementById("action").innerText = data.action;
+ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+};
+
+ws.onclose = () => {
+    console.log("WebSocket connection closed");
 };
 </script>
 
