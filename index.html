@@ -73,8 +73,14 @@ ws.onmessage = (event) => {
     const container = document.getElementById("container");
     container.innerHTML = "";
 
-    for (const coin in data) {
-        const item = data[coin];
+    const list = data.opportunities || [];
+
+    if (list.length === 0) {
+        container.innerHTML = "<p>No profitable opportunities</p>";
+        return;
+    }
+
+    list.forEach(item => {
 
         let profitClass = "neutral";
 
@@ -86,7 +92,7 @@ ws.onmessage = (event) => {
 
         const card = `
             <div class="card">
-                <div class="coin">${coin}</div>
+                <div class="coin">${item.coin}</div>
 
                 <div class="section">
                     <b>Binance</b><br>
@@ -111,7 +117,7 @@ ws.onmessage = (event) => {
         `;
 
         container.innerHTML += card;
-    }
+    });
 };
 
 ws.onerror = (err) => {

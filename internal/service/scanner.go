@@ -3,6 +3,7 @@ package service
 import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/websocket"
+	"sort"
 	"time"
 )
 
@@ -14,11 +15,11 @@ func StartScanner() {
 	go func() {
 		for {
 
-			results := make(map[string]interface{})
+			var results []map[string]interface{}
 
 			for _, coin := range coins {
-				binanceAsk, binanceBid, _ := exchange.GetBinancePrice(coin)
-				kuCoinAsk, kuCoinBid, _ := exchange.GetKuCoinPrice(coin)
+				binanceBid, binanceAsk, _ := exchange.GetBinancePrice(coin)
+				kuCoinBid, kuCoinAsk, _ := exchange.GetKuCoinPrice(coin)
 
 				profit1 := kuCoinBid - binanceAsk
 				profit2 := binanceBid - kuCoinAsk
@@ -34,23 +35,34 @@ func StartScanner() {
 					action = "Buy KuCoin → Sell Binance"
 				}
 
-				threshold := 0.0
+				threshold := -5.0
+
 				if realProfit < threshold {
-					action = "No profitable arbitrage"
+					continue
 				}
 
-				results[coin] = map[string]interface{}{
+				results = append(results, map[string]interface{}{
+					"coin":        coin,
 					"binance_bid": binanceBid,
 					"binance_ask": binanceAsk,
 					"kucoin_bid":  kuCoinBid,
 					"kucoin_ask":  kuCoinAsk,
 					"real_profit": realProfit,
 					"action":      action,
-				}
+				})
 			}
-			LatestResult = results
 
+			sort.Slice(results, func(i, j int) bool {
+				return results[i]["real_profit"].(float64) >
+					results[j]["real_profit"].(float64)
+			})
+
+			LatestResult = map[string]interface{}{
+				"opportunities": results,
+				"timestamp":    time.Now(),
+			}
 			websocket.Broadcast(LatestResult)
+
 			time.Sleep(2 * time.Second)
 
 		}
