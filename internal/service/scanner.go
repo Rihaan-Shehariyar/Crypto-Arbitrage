@@ -12,6 +12,7 @@ var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
 func StartScanner() {
 
+
 	go func() {
 		for {
 
