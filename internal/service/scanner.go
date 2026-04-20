@@ -63,7 +63,8 @@ func StartScanner() {
 						res := <-ch
 
 						if res.Err != nil {
-							return
+							println("Error:", c, res.Exchange)
+							continue
 						}
 
 						switch res.Exchange {
@@ -75,7 +76,7 @@ func StartScanner() {
 							kucoinAsk = res.Ask
 						}
 					}
-
+					println("DEBUG:", c, binanceBid, kucoinBid)
 					if binanceBid == 0 || kucoinBid == 0 {
 						return
 					}
@@ -96,10 +97,10 @@ func StartScanner() {
 						action = "Buy KuCoin → Sell Binance"
 					}
 
-					threshold := -5.02  //0.2
-					if realProfit < threshold {
-						return
-					}
+					// threshold := -100.02 //0.2
+					// if realProfit < threshold {
+					// 	return
+					// }
 
 					resultsCh <- Opportunity{
 						Coin:       c,
