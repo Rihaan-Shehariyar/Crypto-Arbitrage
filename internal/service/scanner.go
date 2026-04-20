@@ -17,6 +17,13 @@ type Opportunity struct {
 	Action     string  `json:"action"`
 }
 
+type PriceResult struct {
+	Exchange string
+	Bid      float64
+	Ask      float64
+	Err      error
+}
+
 var LatestResult map[string]interface{}
 var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
@@ -28,11 +35,45 @@ func StartScanner() {
 			var results []Opportunity
 
 			for _, coin := range coins {
-				binanceBid, binanceAsk, _ := exchange.GetBinancePrice(coin)
-				kuCoinBid, kuCoinAsk, _ := exchange.GetKuCoinPrice(coin)
+				ch := make(chan PriceResult, 2)
 
-				profit1 := kuCoinBid - binanceAsk
-				profit2 := binanceBid - kuCoinAsk
+				go func(c string) {
+					bid, ask, err := exchange.GetBinancePrice(c)
+					ch <- PriceResult{"binance", bid, ask, err}
+				}(coin)
+
+				go func(c string) {
+					bid, ask, err := exchange.GetKuCoinPrice(c)
+					ch <- PriceResult{"kucoin", bid, ask, err}
+				}(coin)
+
+				var binanceBid, binanceAsk float64
+				var kucoinBid, kucoinAsk float64
+
+				for i := 0; i < 2; i++ {
+					res := <-ch
+
+					if res.Err != nil {
+						continue
+					}
+
+					if res.Exchange == "binance" {
+						binanceBid = res.Bid
+						binanceAsk = res.Ask
+					} else if res.Exchange == "kucoin" {
+						kucoinBid = res.Bid
+						kucoinAsk = res.Ask
+					}
+				}
+
+				if binanceBid == 0 || kucoinBid == 0 {
+					continue
+				}
+
+				fee := 0.001
+
+				profit1 := kucoinBid*(1-fee) - binanceAsk*(1+fee)
+				profit2 := binanceBid*(1-fee) - kucoinAsk*(1+fee)
 
 				var realProfit float64
 				var action string
@@ -45,7 +86,7 @@ func StartScanner() {
 					action = "Buy KuCoin → Sell Binance"
 				}
 
-				threshold := -5.0
+				threshold := 0.2
 
 				if realProfit < threshold {
 					continue
@@ -55,8 +96,8 @@ func StartScanner() {
 					Coin:       coin,
 					BinanceBid: binanceBid,
 					BinanceAsk: binanceAsk,
-					KucoinBid:  kuCoinBid,
-					KucoinAsk:  kuCoinAsk,
+					KucoinBid:  kucoinBid,
+					KucoinAsk:  kucoinAsk,
 					Profit:     realProfit,
 					Action:     action,
 				})
