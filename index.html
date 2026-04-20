@@ -61,72 +61,80 @@
 <body>
 
 <h1>🚀 Crypto Arbitrage Dashboard</h1>
+<p id="time" class="neutral"></p>
 
 <div id="container"></div>
 
 <script>
-const ws = new WebSocket("ws://localhost:8080/ws");
+function connectWS() {
+    const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-    const container = document.getElementById("container");
-    container.innerHTML = "";
+        const container = document.getElementById("container");
+        const list = data.opportunities || [];
 
-    const list = data.opportunities || [];
+        document.getElementById("time").innerText =
+            "Last update: " + new Date(data.timestamp).toLocaleTimeString();
 
-    if (list.length === 0) {
-        container.innerHTML = "<p>No profitable opportunities</p>";
-        return;
-    }
+      if (list.length === 0) {
+    container.innerHTML = "<p>No profitable opportunities</p>";
+    return;
+}
 
-    list.forEach(item => {
+        let html = "";
 
-        let profitClass = "neutral";
+        list.forEach(item => {
+            let profitClass = "neutral";
 
-        if (item.real_profit > 0) {
-            profitClass = "green";
-        } else if (item.real_profit < 0) {
-            profitClass = "red";
-        }
+            if (item.profit > 0) {
+                profitClass = "green";
+            } else if (item.profit < 0) {
+                profitClass = "red";
+            }
 
-        const card = `
-            <div class="card">
-                <div class="coin">${item.coin}</div>
+            html += `
+                <div class="card">
+                    <div class="coin">${item.coin}</div>
 
-                <div class="section">
-                    <b>Binance</b><br>
-                    Bid: ${item.binance_bid}<br>
-                    Ask: ${item.binance_ask}
+                    <div class="section">
+                        <b>Binance</b><br>
+                        Bid: ${item.binance_bid}<br>
+                        Ask: ${item.binance_ask}
+                    </div>
+
+                    <div class="section">
+                        <b>KuCoin</b><br>
+                        Bid: ${item.kucoin_bid}<br>
+                        Ask: ${item.kucoin_ask}
+                    </div>
+
+                    <div class="profit ${profitClass}">
+                        Profit: ${item.profit.toFixed(2)}
+                    </div>
+
+                    <div class="action">
+                        ${item.action}
+                    </div>
                 </div>
+            `;
+        });
 
-                <div class="section">
-                    <b>KuCoin</b><br>
-                    Bid: ${item.kucoin_bid}<br>
-                    Ask: ${item.kucoin_ask}
-                </div>
+        container.innerHTML = html;
+    };
 
-                <div class="profit ${profitClass}">
-                    Profit: ${item.real_profit.toFixed(2)}
-                </div>
+    ws.onclose = () => {
+        console.log("Reconnecting...");
+        setTimeout(connectWS, 2000);
+    };
 
-                <div class="action">
-                    ${item.action}
-                </div>
-            </div>
-        `;
+    ws.onerror = () => {
+        ws.close();
+    };
+}
 
-        container.innerHTML += card;
-    });
-};
-
-ws.onerror = (err) => {
-    console.error("WebSocket error:", err);
-};
-
-ws.onclose = () => {
-    console.log("WebSocket connection closed");
-};
+connectWS();
 </script>
 
 </body>

@@ -4,6 +4,7 @@ import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/websocket"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -32,80 +33,98 @@ func StartScanner() {
 	go func() {
 		for {
 
-			var results []Opportunity
+			resultsCh := make(chan Opportunity, len(coins))
+			var wg sync.WaitGroup
 
 			for _, coin := range coins {
-				ch := make(chan PriceResult, 2)
+				wg.Add(1)
 
 				go func(c string) {
-					bid, ask, err := exchange.GetBinancePrice(c)
-					ch <- PriceResult{"binance", bid, ask, err}
-				}(coin)
+					defer wg.Done()
 
-				go func(c string) {
-					bid, ask, err := exchange.GetKuCoinPrice(c)
-					ch <- PriceResult{"kucoin", bid, ask, err}
-				}(coin)
+					ch := make(chan PriceResult, 2)
 
-				var binanceBid, binanceAsk float64
-				var kucoinBid, kucoinAsk float64
+					// Binance
+					go func() {
+						bid, ask, err := exchange.GetBinancePrice(c)
+						ch <- PriceResult{"binance", bid, ask, err}
+					}()
 
-				for i := 0; i < 2; i++ {
-					res := <-ch
+					// KuCoin
+					go func() {
+						bid, ask, err := exchange.GetKuCoinPrice(c)
+						ch <- PriceResult{"kucoin", bid, ask, err}
+					}()
 
-					if res.Err != nil {
-						continue
+					var binanceBid, binanceAsk float64
+					var kucoinBid, kucoinAsk float64
+
+					for i := 0; i < 2; i++ {
+						res := <-ch
+
+						if res.Err != nil {
+							return
+						}
+
+						switch res.Exchange {
+						case "binance":
+							binanceBid = res.Bid
+							binanceAsk = res.Ask
+						case "kucoin":
+							kucoinBid = res.Bid
+							kucoinAsk = res.Ask
+						}
 					}
 
-					if res.Exchange == "binance" {
-						binanceBid = res.Bid
-						binanceAsk = res.Ask
-					} else if res.Exchange == "kucoin" {
-						kucoinBid = res.Bid
-						kucoinAsk = res.Ask
+					if binanceBid == 0 || kucoinBid == 0 {
+						return
 					}
-				}
 
-				if binanceBid == 0 || kucoinBid == 0 {
-					continue
-				}
+					fee := 0.001
 
-				fee := 0.001
+					profit1 := kucoinBid*(1-fee) - binanceAsk*(1+fee)
+					profit2 := binanceBid*(1-fee) - kucoinAsk*(1+fee)
 
-				profit1 := kucoinBid*(1-fee) - binanceAsk*(1+fee)
-				profit2 := binanceBid*(1-fee) - kucoinAsk*(1+fee)
+					var realProfit float64
+					var action string
 
-				var realProfit float64
-				var action string
+					if profit1 > profit2 {
+						realProfit = profit1
+						action = "Buy Binance → Sell KuCoin"
+					} else {
+						realProfit = profit2
+						action = "Buy KuCoin → Sell Binance"
+					}
 
-				if profit1 > profit2 {
-					realProfit = profit1
-					action = "Buy Binance → Sell KuCoin"
-				} else {
-					realProfit = profit2
-					action = "Buy KuCoin → Sell Binance"
-				}
+					threshold := -5.02  //0.2
+					if realProfit < threshold {
+						return
+					}
 
-				threshold := 0.2
+					resultsCh <- Opportunity{
+						Coin:       c,
+						BinanceBid: binanceBid,
+						BinanceAsk: binanceAsk,
+						KucoinBid:  kucoinBid,
+						KucoinAsk:  kucoinAsk,
+						Profit:     realProfit,
+						Action:     action,
+					}
 
-				if realProfit < threshold {
-					continue
-				}
+				}(coin)
+			}
 
-				results = append(results, Opportunity{
-					Coin:       coin,
-					BinanceBid: binanceBid,
-					BinanceAsk: binanceAsk,
-					KucoinBid:  kucoinBid,
-					KucoinAsk:  kucoinAsk,
-					Profit:     realProfit,
-					Action:     action,
-				})
+			wg.Wait()
+			close(resultsCh)
+
+			var results []Opportunity
+
+			for res := range resultsCh {
+				results = append(results, res)
 			}
 
 			sort.Slice(results, func(i, j int) bool {
-				return results[i].Profit >
-					results[j].Profit
+				return results[i].Profit > results[j].Profit
 			})
 
 			LatestResult = map[string]interface{}{
