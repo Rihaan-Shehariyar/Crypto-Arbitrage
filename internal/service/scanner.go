@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+type Opportunity struct {
+	Coin       string  `json:"coin"`
+	BinanceBid float64 `json:"binance_bid"`
+	BinanceAsk float64 `json:"binance_ask"`
+	KucoinBid  float64 `json:"kucoin_bid"`
+	KucoinAsk  float64 `json:"kucoin_ask"`
+	Profit     float64 `json:"profit"`
+	Action     string  `json:"action"`
+}
+
 var LatestResult map[string]interface{}
 var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
@@ -15,7 +25,7 @@ func StartScanner() {
 	go func() {
 		for {
 
-			var results []map[string]interface{}
+			var results []Opportunity
 
 			for _, coin := range coins {
 				binanceBid, binanceAsk, _ := exchange.GetBinancePrice(coin)
@@ -41,20 +51,20 @@ func StartScanner() {
 					continue
 				}
 
-				results = append(results, map[string]interface{}{
-					"coin":        coin,
-					"binance_bid": binanceBid,
-					"binance_ask": binanceAsk,
-					"kucoin_bid":  kuCoinBid,
-					"kucoin_ask":  kuCoinAsk,
-					"real_profit": realProfit,
-					"action":      action,
+				results = append(results, Opportunity{
+					Coin:       coin,
+					BinanceBid: binanceBid,
+					BinanceAsk: binanceAsk,
+					KucoinBid:  kuCoinBid,
+					KucoinAsk:  kuCoinAsk,
+					Profit:     realProfit,
+					Action:     action,
 				})
 			}
 
 			sort.Slice(results, func(i, j int) bool {
-				return results[i]["real_profit"].(float64) >
-					results[j]["real_profit"].(float64)
+				return results[i].Profit >
+					results[j].Profit
 			})
 
 			LatestResult = map[string]interface{}{

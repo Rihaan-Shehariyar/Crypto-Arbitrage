@@ -3,7 +3,6 @@ package exchange
 import (
 	"encoding/json"
 	"io"
-	"net/http"
 	"strconv"
 	"strings"
 )
@@ -23,7 +22,7 @@ func GetKuCoinPrice(symbol string) (float64, float64, error) {
 
 	kucoinSymbol := formatKucoinSymbol(symbol)
 	url := "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=" + kucoinSymbol
-	resp, err := http.Get(url)
+	resp, err := HttpClient.Get(url)
 	if err != nil {
 		return 0, 0, err
 	}

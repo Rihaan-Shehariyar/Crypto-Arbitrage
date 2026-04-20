@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type BinanceResponse struct {
@@ -12,10 +13,14 @@ type BinanceResponse struct {
 	AskPrice string `json:"askPrice"`
 }
 
+var HttpClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
+
 func GetBinancePrice(symbol string) (float64, float64, error) {
 
 	url := "https://api.binance.com/api/v3/ticker/bookTicker?symbol=" + symbol
-	resp, err := http.Get(url)
+	resp, err := HttpClient.Get(url)
 	if err != nil {
 		return 0, 0, err
 	}
