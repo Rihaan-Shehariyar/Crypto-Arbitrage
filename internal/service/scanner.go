@@ -84,7 +84,7 @@ func StartScanner() {
 					binanceAsk := binance.Ask
 					kucoinBid := kucoin.Bid
 					kucoinAsk := kucoin.Ask
-			
+
 					println("DEBUG:", c, binanceBid, kucoinBid)
 					if binanceBid == 0 || kucoinBid == 0 {
 						return
