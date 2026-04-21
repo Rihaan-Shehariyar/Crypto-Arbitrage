@@ -1,39 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Crypto Arbitrage Dashboard</title>
+    <title>Arbitrage Dashboard</title>
 
     <style>
         body {
+            margin: 0;
             font-family: Arial;
             background: #0f172a;
             color: white;
-            text-align: center;
         }
 
-        h1 {
-            margin-top: 20px;
+        header {
+            padding: 20px;
+            background: #020617;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        h1 { margin: 0; }
+
+        #time { color: #94a3b8; }
+
+        #summary {
+            text-align: center;
+            padding: 15px;
+            background: #020617;
+            border-bottom: 1px solid #1e293b;
+            font-size: 14px;
         }
 
         #container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+            padding: 20px;
         }
 
         .card {
             background: #1e293b;
-            padding: 20px;
-            margin: 15px;
-            width: 260px;
+            padding: 18px;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: 0.2s;
+        }
+
+        .card:hover {
+            transform: scale(1.03);
         }
 
         .coin {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 10px;
         }
 
         .section {
@@ -42,9 +60,8 @@
         }
 
         .profit {
-            font-size: 18px;
-            font-weight: bold;
             margin-top: 10px;
+            font-weight: bold;
         }
 
         .green { color: #22c55e; }
@@ -52,16 +69,21 @@
         .neutral { color: #94a3b8; }
 
         .action {
-            margin-top: 5px;
+            margin-top: 6px;
             font-size: 13px;
+            color: #38bdf8;
         }
     </style>
 </head>
 
 <body>
 
-<h1>Crypto Arbitrage Dashboard</h1>
-<p id="time" class="neutral"></p>
+<header>
+    <h1>Arbitrage Dashboard</h1>
+    <div id="time">Connecting...</div>
+</header>
+
+<div id="summary">Loading market data...</div>
 
 <div id="container"></div>
 
@@ -71,51 +93,85 @@ function connectWS() {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        let list = data.opportunities || [];
 
         const container = document.getElementById("container");
-        const list = data.opportunities || [];
 
         document.getElementById("time").innerText =
             "Last update: " + new Date(data.timestamp).toLocaleTimeString();
 
-      if (list.length === 0) {
-    container.innerHTML = "<p>No profitable opportunities</p>";
-    return;
-}
+        // 🔥 FALLBACK DATA (for demo / empty state)
+        if (list.length === 0) {
+            list = [{
+                coin: "BTCUSDT",
+                buy_from: "binance",
+                sell_to: "kucoin",
+                buy_price: 75000,
+                sell_price: 74980,
+                profit: -20,
+                action: "Buy Binance → Sell KuCoin"
+            }];
+        }
+
+        // 🔍 SUMMARY
+        const best = list[0];
+        const bestSpread = (best.sell_price - best.buy_price);
+
+        document.getElementById("summary").innerHTML = `
+             Market Analysis |
+            Best: ${best.coin} |
+            Spread: ${bestSpread.toFixed(2)} |
+            Profit: ${best.profit.toFixed(2)} |
+            Opportunities: ${list.length}
+        `;
 
         let html = "";
 
-        list.forEach(item => {
-            let profitClass = "neutral";
+        list.forEach((item, index) => {
 
+            const buy = item.buy_price || 0;
+            const sell = item.sell_price || 0;
+
+            const spread = sell - buy;
+
+            const profitPercent = buy > 0
+                ? ((sell - buy) / buy) * 100
+                : 0;
+
+            let profitClass = "neutral";
             if (item.profit > 0) {
                 profitClass = "green";
-            } else if (item.profit < 0) {
+            } else {
                 profitClass = "red";
             }
 
+            let border = index === 0 ? "2px solid gold" : "none";
+
             html += `
-                <div class="card">
+                <div class="card" style="border:${border}">
                     <div class="coin">${item.coin}</div>
 
                     <div class="section">
-                        <b>Binance</b><br>
-                        Bid: ${item.binance_bid}<br>
-                        Ask: ${item.binance_ask}
+                        <b>BUY:</b> ${item.buy_from || "N/A"} <br>
+                        Price: ${buy.toFixed(2)}
                     </div>
 
                     <div class="section">
-                        <b>KuCoin</b><br>
-                        Bid: ${item.kucoin_bid}<br>
-                        Ask: ${item.kucoin_ask}
+                        <b>SELL:</b> ${item.sell_to || "N/A"} <br>
+                        Price: ${sell.toFixed(2)}
+                    </div>
+
+                    <div class="section">
+                        Spread: ${spread.toFixed(2)}
                     </div>
 
                     <div class="profit ${profitClass}">
-                        Profit: ${item.profit.toFixed(2)}
+                        Profit: ${item.profit.toFixed(2)} 
+                        (${profitPercent.toFixed(3)}%)
                     </div>
 
                     <div class="action">
-                        ${item.action}
+                        ${item.action || ""}
                     </div>
                 </div>
             `;
@@ -125,7 +181,7 @@ function connectWS() {
     };
 
     ws.onclose = () => {
-        console.log("Reconnecting...");
+        document.getElementById("time").innerText = "Reconnecting...";
         setTimeout(connectWS, 2000);
     };
 

@@ -9,13 +9,13 @@ import (
 )
 
 type Opportunity struct {
-	Coin       string  `json:"coin"`
-	BinanceBid float64 `json:"binance_bid"`
-	BinanceAsk float64 `json:"binance_ask"`
-	KucoinBid  float64 `json:"kucoin_bid"`
-	KucoinAsk  float64 `json:"kucoin_ask"`
-	Profit     float64 `json:"profit"`
-	Action     string  `json:"action"`
+	Coin      string  `json:"coin"`
+	BuyFrom   string  `json:"buy_from"`
+	SellTo    string  `json:"sell_to"`
+	BuyPrice  float64 `json:"buy_price"`
+	SellPrice float64 `json:"sell_price"`
+	Profit    float64 `json:"profit"`
+	Action    string  `json:"action"`
 }
 
 type PriceResult struct {
@@ -26,11 +26,13 @@ type PriceResult struct {
 }
 
 var LatestResult map[string]interface{}
+
 var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
 var exchanges = []exchange.Exchange{
 	exchange.Binance{},
 	exchange.Kucoin{},
+	exchange.Bybit{},
 }
 
 func StartScanner() {
@@ -49,7 +51,7 @@ func StartScanner() {
 
 					ch := make(chan PriceResult, len(exchanges))
 
-					
+					//  Fetch all exchanges
 					for _, ex := range exchanges {
 						go func(e exchange.Exchange) {
 							bid, ask, err := e.GetPrice(c)
@@ -64,61 +66,69 @@ func StartScanner() {
 
 					prices := make(map[string]PriceResult)
 
+					// Collect + validate
 					for i := 0; i < len(exchanges); i++ {
 						res := <-ch
 
 						if res.Err != nil {
+							println("ERROR:", c, res.Exchange)
 							continue
 						}
+
+						if res.Bid == 0 || res.Ask == 0 {
+							println("ZERO:", c, res.Exchange)
+							continue
+						}
+
+						println("OK:", c, res.Exchange, res.Bid, res.Ask)
 						prices[res.Exchange] = res
-
 					}
-					binance, ok1 := prices["binance"]
-					kucoin, ok2 := prices["kucoin"]
 
-					if !ok1 || !ok2 {
+					println("VALID EXCHANGES:", c, len(prices))
+
+					// Need at least 2 exchanges
+					if len(prices) < 2 {
+						println("NOT ENOUGH DATA:", c)
 						return
 					}
 
-					binanceBid := binance.Bid
-					binanceAsk := binance.Ask
-					kucoinBid := kucoin.Bid
-					kucoinAsk := kucoin.Ask
-
-					println("DEBUG:", c, binanceBid, kucoinBid)
-					if binanceBid == 0 || kucoinBid == 0 {
-						return
-					}
+					//  Find best arbitrage pair
+					bestProfit := -1e9
+					var bestBuy PriceResult
+					var bestSell PriceResult
 
 					fee := 0.001
 
-					profit1 := kucoinBid*(1-fee) - binanceAsk*(1+fee)
-					profit2 := binanceBid*(1-fee) - kucoinAsk*(1+fee)
+					for _, buy := range prices {
+						for _, sell := range prices {
 
-					var realProfit float64
-					var action string
+							if buy.Exchange == sell.Exchange {
+								continue
+							}
 
-					if profit1 > profit2 {
-						realProfit = profit1
-						action = "Buy Binance → Sell KuCoin"
-					} else {
-						realProfit = profit2
-						action = "Buy KuCoin → Sell Binance"
+							profit := sell.Bid*(1-fee) - buy.Ask*(1+fee)
+
+							if profit > bestProfit {
+								bestProfit = profit
+								bestBuy = buy
+								bestSell = sell
+							}
+						}
 					}
 
-					// threshold := -100.02 //0.2
-					// if realProfit < threshold {
-					// 	return
-					// }
+					println("BEST:", c, bestBuy.Exchange, bestSell.Exchange, bestProfit)
+
+					// Even if negative, send it (for UI visibility)
+					action := "Buy " + bestBuy.Exchange + " → Sell " + bestSell.Exchange
 
 					resultsCh <- Opportunity{
-						Coin:       c,
-						BinanceBid: binanceBid,
-						BinanceAsk: binanceAsk,
-						KucoinBid:  kucoinBid,
-						KucoinAsk:  kucoinAsk,
-						Profit:     realProfit,
-						Action:     action,
+						Coin:      c,
+						BuyFrom:   bestBuy.Exchange,
+						SellTo:    bestSell.Exchange,
+						BuyPrice:  bestBuy.Ask,
+						SellPrice: bestSell.Bid,
+						Profit:    bestProfit,
+						Action:    action,
 					}
 
 				}(coin)
@@ -141,11 +151,10 @@ func StartScanner() {
 				"opportunities": results,
 				"timestamp":     time.Now(),
 			}
+
 			websocket.Broadcast(LatestResult)
 
 			time.Sleep(2 * time.Second)
-
 		}
-
 	}()
 }

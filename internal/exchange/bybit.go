@@ -4,34 +4,28 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
-	"strings"
 )
 
-type Kucoin struct{}
+type Bybit struct{}
 
-func (k Kucoin) Name() string {
-	return "kucoin"
+func (b Bybit) Name() string {
+	return "bybit"
 }
 
-func (k Kucoin) GetPrice(symbol string) (float64, float64, error) {
-	return GetKuCoinPrice(symbol)
+func (b Bybit) GetPrice(symbol string) (float64, float64, error) {
+	return GetBybitPrice(symbol)
 }
 
-type KucoinResponse struct {
+type bytbitResponse struct {
 	Data struct {
 		BidPrice string `json:"bidPrice"`
 		AskPrice string `json:"askPrice"`
 	} `json:"data"`
 }
 
-func formatKucoinSymbol(symbol string) string {
-	return strings.Replace(symbol, "USDT", "-USDT", 1)
-}
+func GetBybitPrice(symbol string) (float64, float64, error) {
+	url := "https://api.bybit.com/v5/market/tickers?category=spot&symbol=" + symbol
 
-func GetKuCoinPrice(symbol string) (float64, float64, error) {
-
-	kucoinSymbol := formatKucoinSymbol(symbol)
-	url := "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=" + kucoinSymbol
 	resp, err := HttpClient.Get(url)
 	if err != nil {
 		return 0, 0, err
@@ -44,7 +38,7 @@ func GetKuCoinPrice(symbol string) (float64, float64, error) {
 		return 0, 0, err
 	}
 
-	var data KucoinResponse
+	var data bytbitResponse
 
 	err = json.Unmarshal(body, &data)
 
