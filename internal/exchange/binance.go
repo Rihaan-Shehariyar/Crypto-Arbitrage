@@ -8,6 +8,16 @@ import (
 	"time"
 )
 
+type Binance struct{}
+
+func (b Binance) Name() string {
+	return "binance"
+}
+
+func (b Binance) GetPrice(symbol string) (float64, float64, error) {
+	return GetBinancePrice(symbol)
+}
+
 type BinanceResponse struct {
 	BidPrice string `json:"bidPrice"`
 	AskPrice string `json:"askPrice"`

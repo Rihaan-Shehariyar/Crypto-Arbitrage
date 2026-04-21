@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+type Kucoin struct{}
+
+func (k *Kucoin) Name() string {
+	return "kucoin"
+}
+
+func (k *Kucoin) GetPrice(symbol string) (float64, float64, error) {
+	return GetKuCoinPrice(symbol)
+}
+
 type KucoinResponse struct {
 	Data struct {
 		BestBid string `json:"bestBid"`

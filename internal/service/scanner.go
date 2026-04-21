@@ -28,6 +28,11 @@ type PriceResult struct {
 var LatestResult map[string]interface{}
 var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
+var exchanges = []exchange.Exchange{
+	exchange.Binance{},
+	&exchange.Kucoin{},
+}
+
 func StartScanner() {
 
 	go func() {
@@ -45,37 +50,41 @@ func StartScanner() {
 					ch := make(chan PriceResult, 2)
 
 					// Binance
-					go func() {
-						bid, ask, err := exchange.GetBinancePrice(c)
-						ch <- PriceResult{"binance", bid, ask, err}
-					}()
+					for _, ex := range exchanges {
+						go func(e exchange.Exchange) {
+							bid, ask, err := e.GetPrice(c)
+							ch <- PriceResult{
+								Exchange: e.Name(),
+								Bid:      bid,
+								Ask:      ask,
+								Err:      err,
+							}
+						}(ex)
+					}
 
-					// KuCoin
-					go func() {
-						bid, ask, err := exchange.GetKuCoinPrice(c)
-						ch <- PriceResult{"kucoin", bid, ask, err}
-					}()
+					prices := make(map[string]PriceResult)
 
-					var binanceBid, binanceAsk float64
-					var kucoinBid, kucoinAsk float64
-
-					for i := 0; i < 2; i++ {
+					for i := 0; i < len(exchanges); i++ {
 						res := <-ch
 
 						if res.Err != nil {
-							println("Error:", c, res.Exchange)
 							continue
 						}
+						prices[res.Exchange] = res
 
-						switch res.Exchange {
-						case "binance":
-							binanceBid = res.Bid
-							binanceAsk = res.Ask
-						case "kucoin":
-							kucoinBid = res.Bid
-							kucoinAsk = res.Ask
-						}
 					}
+					binance, ok1 := prices["binance"]
+					kucoin, ok2 := prices["kucoin"]
+
+					if !ok1 || ok2 {
+						return
+					}
+
+					binanceBid := binance.Bid
+					binanceAsk := binance.Ask
+					kucoinBid := kucoin.Bid
+					kucoinAsk := kucoin.Ask
+			
 					println("DEBUG:", c, binanceBid, kucoinBid)
 					if binanceBid == 0 || kucoinBid == 0 {
 						return
