@@ -30,7 +30,7 @@ var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
 var exchanges = []exchange.Exchange{
 	exchange.Binance{},
-	&exchange.Kucoin{},
+	exchange.Kucoin{},
 }
 
 func StartScanner() {
@@ -47,9 +47,9 @@ func StartScanner() {
 				go func(c string) {
 					defer wg.Done()
 
-					ch := make(chan PriceResult, 2)
+					ch := make(chan PriceResult, len(exchanges))
 
-					// Binance
+					
 					for _, ex := range exchanges {
 						go func(e exchange.Exchange) {
 							bid, ask, err := e.GetPrice(c)
@@ -76,7 +76,7 @@ func StartScanner() {
 					binance, ok1 := prices["binance"]
 					kucoin, ok2 := prices["kucoin"]
 
-					if !ok1 || ok2 {
+					if !ok1 || !ok2 {
 						return
 					}
 
