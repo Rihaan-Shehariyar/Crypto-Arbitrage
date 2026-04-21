@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+
 type Bybit struct{}
 
 func (b Bybit) Name() string {
