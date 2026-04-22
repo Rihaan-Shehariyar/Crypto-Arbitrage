@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -47,6 +48,10 @@ func GetBinancePrice(symbol string) (float64, float64, error) {
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return 0, 0, err
+	}
+
+	if data.BidPrice == "" || data.AskPrice == "" {
+		return 0, 0, fmt.Errorf("binance: empty prices")
 	}
 
 	bid, err := strconv.ParseFloat(data.BidPrice, 64)

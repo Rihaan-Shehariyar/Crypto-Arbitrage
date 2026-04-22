@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/websocket"
 	"log"
@@ -54,10 +55,16 @@ var exchanges = []exchange.Exchange{
 	exchange.Bybit{},
 }
 
-func StartScanner() {
+func StartScanner(ctx context.Context) {
 
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				log.Println("🛑 Scanner shutting down...")
+				return
+			default:
+			}
 
 			resultsCh := make(chan Opportunity, len(coins))
 			var wg sync.WaitGroup
@@ -207,7 +214,11 @@ func StartScanner() {
 
 			websocket.Broadcast(LatestResult)
 
-			time.Sleep(30 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
 		}
 	}()
 }

@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -50,6 +51,10 @@ func GetKuCoinPrice(symbol string) (float64, float64, error) {
 
 	if err != nil {
 		return 0, 0, err
+	}
+
+	if data.Data.BestBid == "" || data.Data.BestAsk == "" {
+		return 0, 0, fmt.Errorf("kucoin: empty prices")
 	}
 
 	bid, err := strconv.ParseFloat(data.Data.BestBid, 64)
