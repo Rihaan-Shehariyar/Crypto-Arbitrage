@@ -3,6 +3,7 @@ package service
 import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/websocket"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -80,7 +81,8 @@ func StartScanner() {
 							continue
 						}
 
-						println("OK:", c, res.Exchange, res.Bid, res.Ask)
+						log.Printf("[SCAN] %s | %s | Bid: %.2f Ask: %.2f", c, res.Exchange, res.Bid, res.Ask)
+
 						prices[res.Exchange] = res
 					}
 
@@ -88,10 +90,32 @@ func StartScanner() {
 
 					// Need at least 2 exchanges
 					if len(prices) < 2 {
-						println("NOT ENOUGH DATA:", c)
+
+						for _, p := range prices {
+							resultsCh <- Opportunity{
+								Coin:      c,
+								BuyFrom:   p.Exchange,
+								SellTo:    p.Exchange,
+								BuyPrice:  p.Ask,
+								SellPrice: p.Bid,
+								Profit:    0,
+								Action:    "Single exchange data",
+							}
+							return
+						}
+
+						// no data at all
+						resultsCh <- Opportunity{
+							Coin:      c,
+							BuyFrom:   "N/A",
+							SellTo:    "N/A",
+							BuyPrice:  0,
+							SellPrice: 0,
+							Profit:    0,
+							Action:    "No data",
+						}
 						return
 					}
-
 					//  Find best arbitrage pair
 					bestProfit := -1e9
 					var bestBuy PriceResult
@@ -147,8 +171,14 @@ func StartScanner() {
 				return results[i].Profit > results[j].Profit
 			})
 
+			var bestTrade Opportunity
+			if len(results) > 0 {
+				bestTrade = results[0]
+			}
+
 			LatestResult = map[string]interface{}{
 				"opportunities": results,
+				"best_trade":    bestTrade,
 				"timestamp":     time.Now(),
 			}
 

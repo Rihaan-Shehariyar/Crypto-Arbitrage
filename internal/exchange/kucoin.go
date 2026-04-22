@@ -19,8 +19,8 @@ func (k Kucoin) GetPrice(symbol string) (float64, float64, error) {
 
 type KucoinResponse struct {
 	Data struct {
-		BidPrice string `json:"bidPrice"`
-		AskPrice string `json:"askPrice"`
+		BestBid string `json:"bestBid"`
+		BestAsk string `json:"bestAsk"`
 	} `json:"data"`
 }
 
@@ -52,12 +52,12 @@ func GetKuCoinPrice(symbol string) (float64, float64, error) {
 		return 0, 0, err
 	}
 
-	bid, err := strconv.ParseFloat(data.Data.BidPrice, 64)
+	bid, err := strconv.ParseFloat(data.Data.BestBid, 64)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	ask, err := strconv.ParseFloat(data.Data.AskPrice, 64)
+	ask, err := strconv.ParseFloat(data.Data.BestAsk, 64)
 	if err != nil {
 		return 0, 0, err
 	}

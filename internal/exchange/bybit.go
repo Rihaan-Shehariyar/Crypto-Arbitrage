@@ -16,11 +16,13 @@ func (b Bybit) GetPrice(symbol string) (float64, float64, error) {
 	return GetBybitPrice(symbol)
 }
 
-type bytbitResponse struct {
-	Data struct {
-		BidPrice string `json:"bidPrice"`
-		AskPrice string `json:"askPrice"`
-	} `json:"data"`
+type BybitResponse struct {
+	Result struct {
+		List []struct {
+			Bid1Price string `json:"bid1Price"`
+			Ask1Price string `json:"ask1Price"`
+		} `json:"list"`
+	} `json:"result"`
 }
 
 func GetBybitPrice(symbol string) (float64, float64, error) {
@@ -38,7 +40,7 @@ func GetBybitPrice(symbol string) (float64, float64, error) {
 		return 0, 0, err
 	}
 
-	var data bytbitResponse
+	var data BybitResponse
 
 	err = json.Unmarshal(body, &data)
 
@@ -46,12 +48,12 @@ func GetBybitPrice(symbol string) (float64, float64, error) {
 		return 0, 0, err
 	}
 
-	bid, err := strconv.ParseFloat(data.Data.BidPrice, 64)
+	bid, err := strconv.ParseFloat(data.Result.List[0].Bid1Price, 64)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	ask, err := strconv.ParseFloat(data.Data.AskPrice, 64)
+	ask, err := strconv.ParseFloat(data.Result.List[0].Ask1Price, 64)
 	if err != nil {
 		return 0, 0, err
 	}
