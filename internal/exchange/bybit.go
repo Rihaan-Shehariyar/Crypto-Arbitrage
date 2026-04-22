@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 )
@@ -46,6 +47,10 @@ func GetBybitPrice(symbol string) (float64, float64, error) {
 
 	if err != nil {
 		return 0, 0, err
+	}
+
+	if len(data.Result.List) == 0 {
+		return 0, 0, fmt.Errorf("no data from bybit")
 	}
 
 	bid, err := strconv.ParseFloat(data.Result.List[0].Bid1Price, 64)

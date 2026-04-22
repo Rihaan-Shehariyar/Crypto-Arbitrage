@@ -10,13 +10,15 @@ import (
 )
 
 type Opportunity struct {
-	Coin      string  `json:"coin"`
-	BuyFrom   string  `json:"buy_from"`
-	SellTo    string  `json:"sell_to"`
-	BuyPrice  float64 `json:"buy_price"`
-	SellPrice float64 `json:"sell_price"`
-	Profit    float64 `json:"profit"`
-	Action    string  `json:"action"`
+	Coin          string  `json:"coin"`
+	BuyFrom       string  `json:"buy_from"`
+	SellTo        string  `json:"sell_to"`
+	BuyPrice      float64 `json:"buy_price"`
+	SellPrice     float64 `json:"sell_price"`
+	Profit        float64 `json:"profit"`
+	ProfitPercent float64 `json:"profit_percent"`
+	Status        string  `json:"status"`
+	Action        string  `json:"action"`
 }
 
 type PriceResult struct {
@@ -28,7 +30,23 @@ type PriceResult struct {
 
 var LatestResult map[string]interface{}
 
-var coins = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
+var coins = []string{
+	"BTCUSDT",
+	"ETHUSDT",
+	"SOLUSDT",
+	"BNBUSDT",
+	"XRPUSDT",
+	"ADAUSDT",
+	"DOGEUSDT",
+	"MATICUSDT",
+	"AVAXUSDT",
+	"LINKUSDT",
+	"LTCUSDT",
+	"DOTUSDT",
+	"TRXUSDT",
+	"ATOMUSDT",
+	"NEARUSDT",
+}
 
 var exchanges = []exchange.Exchange{
 	exchange.Binance{},
@@ -88,7 +106,6 @@ func StartScanner() {
 
 					println("VALID EXCHANGES:", c, len(prices))
 
-					// Need at least 2 exchanges
 					if len(prices) < 2 {
 
 						for _, p := range prices {
@@ -140,19 +157,25 @@ func StartScanner() {
 						}
 					}
 
-					println("BEST:", c, bestBuy.Exchange, bestSell.Exchange, bestProfit)
+					profitPercent := 0.0
+					if bestBuy.Ask > 0 {
+						profitPercent = (bestProfit / bestBuy.Ask) * 100
+					}
 
+					log.Printf("[BEST] %s | %s → %s | Profit: %.4f",
+						c, bestBuy.Exchange, bestSell.Exchange, bestProfit)
 					// Even if negative, send it (for UI visibility)
 					action := "Buy " + bestBuy.Exchange + " → Sell " + bestSell.Exchange
 
 					resultsCh <- Opportunity{
-						Coin:      c,
-						BuyFrom:   bestBuy.Exchange,
-						SellTo:    bestSell.Exchange,
-						BuyPrice:  bestBuy.Ask,
-						SellPrice: bestSell.Bid,
-						Profit:    bestProfit,
-						Action:    action,
+						Coin:          c,
+						BuyFrom:       bestBuy.Exchange,
+						SellTo:        bestSell.Exchange,
+						BuyPrice:      bestBuy.Ask,
+						SellPrice:     bestSell.Bid,
+						Profit:        bestProfit,
+						ProfitPercent: profitPercent,
+						Action:        action,
 					}
 
 				}(coin)
@@ -184,7 +207,7 @@ func StartScanner() {
 
 			websocket.Broadcast(LatestResult)
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(30 * time.Millisecond)
 		}
 	}()
 }
