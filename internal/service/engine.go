@@ -57,7 +57,7 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 							continue
 						}
 
-						// 🚨 skip stale data (>1s)
+						//  skip stale data (>1s)
 						if now-buy.Time > 1000 || now-sell.Time > 1000 {
 							continue
 						}
@@ -74,12 +74,14 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 					}
 				}
 
-				log.Printf("DEBUG %s | %s | Bid: %.2f Ask: %.2f",
-					price.Symbol,
-					price.Exchange,
-					price.Bid,
-					price.Ask,
-				)
+                  // To check
+
+				// log.Printf("DEBUG %s | %s | Bid: %.2f Ask: %.2f",
+				// 	price.Symbol,
+				// 	price.Exchange,
+				// 	price.Bid,
+				// 	price.Ask,
+				// )
 
 				// 4. filter noise
 				if bestPercent < 0.01 {
