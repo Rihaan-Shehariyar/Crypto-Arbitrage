@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto-arbitrage/internal/exchange"
+	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
 	"crypto-arbitrage/internal/service"
 	"crypto-arbitrage/internal/websocket"
@@ -20,7 +22,24 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	service.StartScanner(ctx)
+	//  NEW SYSTEM
+	f := feed.NewFeed()
+
+	binance := exchange.BinanceWS{}
+	binance.Start(f, []string{
+		"BTCUSDT",
+		"ETHUSDT",
+		"SOLUSDT",
+	})
+
+	bybit := exchange.BybitWS{}
+	bybit.Start(f, []string{
+		"BTCUSDT",
+		"ETHUSDT",
+		"SOLUSDT",
+	})
+
+	service.StartEngine(ctx, f)
 
 	r.GET("/ws", handler.HandleWebSocket)
 
@@ -44,7 +63,6 @@ func main() {
 
 	cancel()
 
-	//  time for cleanup
 	ctxTimeout, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelTimeout()
 
@@ -55,7 +73,5 @@ func main() {
 	log.Println("🔌 Closing WebSocket connections...")
 	websocket.CloseAll()
 
-
 	log.Println(" Server exited gracefully")
-
 }
