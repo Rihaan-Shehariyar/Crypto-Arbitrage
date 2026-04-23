@@ -151,6 +151,7 @@ func processBybitOrderbook(data map[string]interface{}, topic string, f *feed.Fe
 		Symbol:   symbol,
 		Bid:      bid,
 		Ask:      ask,
+		Time:     time.Now().UnixMilli(),
 	}:
 	default:
 	}

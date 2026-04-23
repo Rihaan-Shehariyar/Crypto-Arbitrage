@@ -5,6 +5,7 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/websocket"
 	"log"
+	"time"
 )
 
 type Opportunity struct {
@@ -14,35 +15,41 @@ type Opportunity struct {
 	BuyPrice  float64 `json:"buy_price"`
 	SellPrice float64 `json:"sell_price"`
 	Profit    float64 `json:"profit"`
+	Percent   float64 `json:"percent"`
 }
 
-var (
-	LatestResult map[string]interface{}
-	AllResults   = make(map[string]Opportunity)
-)
+var lastOpportunity = make(map[string]float64)
 
 func StartEngine(ctx context.Context, f *feed.Feed) {
 	go func() {
+		log.Println("[ENGINE] started")
+
+		fee := 0.001 // 0.1%
 
 		for {
 			select {
+			case <-ctx.Done():
+				log.Println("[ENGINE] shutting down...")
+				return
 
-			//  incoming price from WS feed
 			case price := <-f.Stream:
 
+				// 1. update latest price
 				UpdatePrice(price)
-				prices := GetPrices(price.Symbol)
 
+				// 2. get all prices for symbol
+				prices := GetPrices(price.Symbol)
 				if len(prices) < 2 {
 					continue
 				}
 
-				bestProfit := -1e9
+				now := time.Now().UnixMilli()
+
+				bestProfit := 0.0
+				bestPercent := 0.0
 				var bestBuy, bestSell feed.Price
 
-				fee := 0.001
-
-				//  find best arbitrage pair
+				// 3. find best opportunity
 				for _, buy := range prices {
 					for _, sell := range prices {
 
@@ -50,9 +57,16 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 							continue
 						}
 
-						profit := sell.Bid*(1-fee) - buy.Ask*(1+fee)
+						// 🚨 skip stale data (>1s)
+						if now-buy.Time > 1000 || now-sell.Time > 1000 {
+							continue
+						}
 
-						if profit > bestProfit {
+						profit := sell.Bid*(1-fee) - buy.Ask*(1+fee)
+						percent := (profit / buy.Ask) * 100
+
+						if percent > bestPercent {
+							bestPercent = percent
 							bestProfit = profit
 							bestBuy = buy
 							bestSell = sell
@@ -60,45 +74,51 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 					}
 				}
 
-				log.Printf("[ENGINE] %s | %s → %s | Profit: %.4f",
+				log.Printf("DEBUG %s | %s | Bid: %.2f Ask: %.2f",
 					price.Symbol,
-					bestBuy.Exchange,
-					bestSell.Exchange,
-					bestProfit,
+					price.Exchange,
+					price.Bid,
+					price.Ask,
 				)
 
-				//  build opportunity
-				op := Opportunity{
+				// 4. filter noise
+				if bestPercent < 0.01 {
+					continue
+				}
+
+				// 5. deduplicate
+				key := price.Symbol
+
+				if lastOpportunity[key] == bestPercent {
+					continue
+				}
+
+				lastOpportunity[key] = bestPercent
+
+				// 6. log clean output
+				log.Printf(
+					" %s | BUY %s @ %.2f → SELL %s @ %.2f | Profit: %.4f (%.3f%%)",
+					price.Symbol,
+					bestBuy.Exchange,
+					bestBuy.Ask,
+					bestSell.Exchange,
+					bestSell.Bid,
+					bestProfit,
+					bestPercent,
+				)
+
+				// 7. broadcast clean data
+				result := Opportunity{
 					Coin:      price.Symbol,
 					BuyFrom:   bestBuy.Exchange,
 					SellTo:    bestSell.Exchange,
 					BuyPrice:  bestBuy.Ask,
 					SellPrice: bestSell.Bid,
 					Profit:    bestProfit,
+					Percent:   bestPercent,
 				}
 
-				//  thread-safe store
-				mu.Lock()
-				AllResults[price.Symbol] = op
-
-				// convert map → slice for UI
-				var list []Opportunity
-				for _, v := range AllResults {
-					list = append(list, v)
-				}
-
-				LatestResult = map[string]interface{}{
-					"opportunities": list,
-				}
-				mu.Unlock()
-
-				//  send to UI
-				websocket.Broadcast(LatestResult)
-
-			//  graceful shutdown
-			case <-ctx.Done():
-				log.Println("[ENGINE] shutting down...")
-				return
+				websocket.Broadcast(result)
 			}
 		}
 	}()

@@ -39,6 +39,13 @@ func main() {
 		"SOLUSDT",
 	})
 
+	kucoin := exchange.KucoinWS{}
+	kucoin.Start(f, []string{
+		"BTC-USDT",
+		"ETH-USDT",
+		"SOL-USDT",
+	})
+
 	service.StartEngine(ctx, f)
 
 	r.GET("/ws", handler.HandleWebSocket)

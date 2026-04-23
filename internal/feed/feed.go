@@ -5,6 +5,7 @@ type Price struct {
 	Symbol   string
 	Ask      float64
 	Bid      float64
+	Time     int64
 }
 
 type Feed struct {

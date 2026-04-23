@@ -15,7 +15,6 @@ type BinanceWS struct{}
 
 func (b BinanceWS) Start(f *feed.Feed, symbols []string) {
 
-
 	go func() {
 		for {
 			// build multiplexed stream URL
@@ -84,6 +83,7 @@ func (b BinanceWS) Start(f *feed.Feed, symbols []string) {
 					Symbol:   symbol,
 					Bid:      bid,
 					Ask:      ask,
+					Time:     time.Now().UnixMilli(),
 				}
 			}
 		}
