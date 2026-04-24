@@ -25,6 +25,7 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 		log.Println("[ENGINE] started")
 
 		fee := 0.001 // 0.1%
+		tradeSize := 1000.0
 
 		for {
 			select {
@@ -34,12 +35,11 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 
 			case price := <-f.Stream:
 
-				// 1. update latest price
+				// Update ticker cache (optional but useful)
 				UpdatePrice(price)
 
-				// 2. get all prices for symbol
-				prices := GetPrices(price.Symbol)
-				if len(prices) < 2 {
+				books := feed.GetOrderBooks(price.Symbol)
+				if len(books) < 2 {
 					continue
 				}
 
@@ -47,75 +47,90 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 
 				bestProfit := 0.0
 				bestPercent := 0.0
-				var bestBuy, bestSell feed.Price
 
-				// 3. find best opportunity
-				for _, buy := range prices {
-					for _, sell := range prices {
+				var bestBuyEx, bestSellEx string
+				var bestBuyPrice, bestSellPrice float64
 
-						if buy.Exchange == sell.Exchange {
+				// MAIN LOGIC
+				for buyEx, buyBook := range books {
+					for sellEx, sellBook := range books {
+
+						if buyEx == sellEx {
 							continue
 						}
 
-						//  skip stale data (>1s)
-						if now-buy.Time > 1000 || now-sell.Time > 1000 {
+						// Skip stale books
+						if now-buyBook.Time > 2000 || now-sellBook.Time > 2000 {
 							continue
 						}
 
-						profit := sell.Bid*(1-fee) - buy.Ask*(1+fee)
-						percent := (profit / buy.Ask) * 100
+						// Ensure depth exists
+						if len(buyBook.Ask) == 0 || len(sellBook.Bids) == 0 {
+							continue
+						}
+
+						// Simulate real buy
+						buyPrice, amount := simulateBuy(buyBook.Ask, tradeSize)
+						if buyPrice == 0 || amount == 0 {
+							continue
+						}
+
+						// Simulate real sell
+						sellPrice := simulateSell(sellBook.Bids, amount)
+						if sellPrice == 0 {
+							continue
+						}
+
+						// Calculate real profit
+						profit := (sellPrice*(1-fee) - buyPrice*(1+fee)) * amount
+						percent := (profit / tradeSize) * 100
 
 						if percent > bestPercent {
 							bestPercent = percent
 							bestProfit = profit
-							bestBuy = buy
-							bestSell = sell
+
+							bestBuyEx = buyEx
+							bestSellEx = sellEx
+
+							bestBuyPrice = buyPrice
+							bestSellPrice = sellPrice
 						}
 					}
 				}
 
-                  // To check
+				// 🔍 DEBUG (optional)
+				// log.Printf("DEBUG %s | Exchanges: %d", price.Symbol, len(books))
 
-				// log.Printf("DEBUG %s | %s | Bid: %.2f Ask: %.2f",
-				// 	price.Symbol,
-				// 	price.Exchange,
-				// 	price.Bid,
-				// 	price.Ask,
-				// )
-
-				// 4. filter noise
-				if bestPercent < 0.01 {
+				// Filter weak signals
+				if bestPercent < 0.05 {
 					continue
 				}
 
-				// 5. deduplicate
+				// Deduplicate (tolerant)
 				key := price.Symbol
-
-				if lastOpportunity[key] == bestPercent {
+				if abs(lastOpportunity[key]-bestPercent) < 0.001 {
 					continue
 				}
-
 				lastOpportunity[key] = bestPercent
 
-				// 6. log clean output
+				// 🚀 Final log
 				log.Printf(
-					" %s | BUY %s @ %.2f → SELL %s @ %.2f | Profit: %.4f (%.3f%%)",
+					"🚀 %s | $%.0f | BUY %s → SELL %s | Profit: $%.2f (%.3f%%)",
 					price.Symbol,
-					bestBuy.Exchange,
-					bestBuy.Ask,
-					bestSell.Exchange,
-					bestSell.Bid,
+					tradeSize,
+					bestBuyEx,
+					bestSellEx,
 					bestProfit,
 					bestPercent,
 				)
 
-				// 7. broadcast clean data
+				// Broadcast result
 				result := Opportunity{
 					Coin:      price.Symbol,
-					BuyFrom:   bestBuy.Exchange,
-					SellTo:    bestSell.Exchange,
-					BuyPrice:  bestBuy.Ask,
-					SellPrice: bestSell.Bid,
+					BuyFrom:   bestBuyEx,
+					SellTo:    bestSellEx,
+					BuyPrice:  bestBuyPrice,
+					SellPrice: bestSellPrice,
 					Profit:    bestProfit,
 					Percent:   bestPercent,
 				}
@@ -124,4 +139,12 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 			}
 		}
 	}()
+}
+
+// 🔧 helper
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
