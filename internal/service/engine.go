@@ -19,13 +19,14 @@ type Opportunity struct {
 }
 
 var lastOpportunity = make(map[string]float64)
+var lastTradeTime = make(map[string]int64)
 
-func StartEngine(ctx context.Context, f *feed.Feed) {
+func StartEngine(ctx context.Context, f *feed.Feed, broker *BybitBroker) {
 	go func() {
 		log.Println("[ENGINE] started")
 
-		fee := 0.001 // 0.1%
-		tradeSize := 1000.0
+		fee := 0.001       // 0.1%
+		tradeSize := 100.0 // keep small for testnet
 
 		for {
 			select {
@@ -35,7 +36,6 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 
 			case price := <-f.Stream:
 
-				// Update ticker cache (optional but useful)
 				UpdatePrice(price)
 
 				books := feed.GetOrderBooks(price.Symbol)
@@ -51,7 +51,9 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 				var bestBuyEx, bestSellEx string
 				var bestBuyPrice, bestSellPrice float64
 
-				// MAIN LOGIC
+				// -----------------------------
+				// 1. FIND BEST OPPORTUNITY
+				// -----------------------------
 				for buyEx, buyBook := range books {
 					for sellEx, sellBook := range books {
 
@@ -59,29 +61,25 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 							continue
 						}
 
-						// Skip stale books
+						// skip stale
 						if now-buyBook.Time > 2000 || now-sellBook.Time > 2000 {
 							continue
 						}
 
-						// Ensure depth exists
-						if len(buyBook.Ask) == 0 || len(sellBook.Bids) == 0 {
+						if len(buyBook.Asks) == 0 || len(sellBook.Bids) == 0 {
 							continue
 						}
 
-						// Simulate real buy
-						buyPrice, amount := simulateBuy(buyBook.Ask, tradeSize)
+						buyPrice, amount := simulateBuy(buyBook.Asks, tradeSize)
 						if buyPrice == 0 || amount == 0 {
 							continue
 						}
 
-						// Simulate real sell
 						sellPrice := simulateSell(sellBook.Bids, amount)
 						if sellPrice == 0 {
 							continue
 						}
 
-						// Calculate real profit
 						profit := (sellPrice*(1-fee) - buyPrice*(1+fee)) * amount
 						percent := (profit / tradeSize) * 100
 
@@ -98,22 +96,35 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 					}
 				}
 
-				// 🔍 DEBUG (optional)
-				// log.Printf("DEBUG %s | Exchanges: %d", price.Symbol, len(books))
-
-				// Filter weak signals
-				if bestPercent < 0.05 {
+				// -----------------------------
+				// 2. VALIDATE
+				// -----------------------------
+				if bestPercent < 0.1 {
 					continue
 				}
 
-				// Deduplicate (tolerant)
+				if bestBuyEx == "" || bestSellEx == "" {
+					continue
+				}
+
+				// TEMP: only Bybit execution
+				if bestBuyEx != "bybit" || bestSellEx != "bybit" {
+					continue
+				}
+
+				// Deduplicate opportunity
 				key := price.Symbol
 				if abs(lastOpportunity[key]-bestPercent) < 0.001 {
 					continue
 				}
 				lastOpportunity[key] = bestPercent
 
-				// 🚀 Final log
+				// Cooldown (3 seconds per symbol)
+				if now-lastTradeTime[key] < 3000 {
+					continue
+				}
+				lastTradeTime[key] = now
+
 				log.Printf(
 					"🚀 %s | $%.0f | BUY %s → SELL %s | Profit: $%.2f (%.3f%%)",
 					price.Symbol,
@@ -124,7 +135,43 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 					bestPercent,
 				)
 
-				// Broadcast result
+				// -----------------------------
+				// 3. EXECUTE TRADE
+				// -----------------------------
+				log.Println("⚡ Executing trade...")
+
+				// BUY
+				buyOrderId, err := broker.MarketBuy(price.Symbol, tradeSize)
+				if err != nil {
+					log.Println("❌ BUY error:", err)
+					continue
+				}
+
+				if !waitForFill(broker, price.Symbol, buyOrderId) {
+					log.Println("❌ BUY not filled")
+					continue
+				}
+
+				// safer qty (slippage buffer)
+				baseQty := (tradeSize / bestBuyPrice) * 0.995
+
+				// SELL
+				sellOrderId, err := broker.MarketSell(price.Symbol, baseQty)
+				if err != nil {
+					log.Println("❌ SELL error:", err)
+					continue
+				}
+
+				if !waitForFill(broker, price.Symbol, sellOrderId) {
+					log.Println("❌ SELL not filled")
+					continue
+				}
+
+				log.Println("✅ TRADE COMPLETED")
+
+				// -----------------------------
+				// 4. BROADCAST
+				// -----------------------------
 				result := Opportunity{
 					Coin:      price.Symbol,
 					BuyFrom:   bestBuyEx,
@@ -141,7 +188,7 @@ func StartEngine(ctx context.Context, f *feed.Feed) {
 	}()
 }
 
-// 🔧 helper
+// helper
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x

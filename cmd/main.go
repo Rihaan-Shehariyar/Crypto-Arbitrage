@@ -46,7 +46,12 @@ func main() {
 		"SOL-USDT",
 	})
 
-	service.StartEngine(ctx, f)
+	broker := service.NewBybitBroker(
+		os.Getenv("BYBIT_KEY"),
+		os.Getenv("BYBIT_SECRET"),
+	)
+
+	service.StartEngine(ctx, f, broker)
 
 	r.GET("/ws", handler.HandleWebSocket)
 

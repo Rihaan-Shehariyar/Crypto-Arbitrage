@@ -7,7 +7,7 @@ type Level struct {
 
 type OrderBook struct {
 	Bids []Level
-	Ask  []Level
+	Asks  []Level
 	Time int64
 }
 
