@@ -143,32 +143,42 @@ func StartEngine(ctx context.Context, f *feed.Feed, broker *BybitBroker) {
 				// BUY
 				buyOrderId, err := broker.MarketBuy(price.Symbol, tradeSize)
 				if err != nil {
-					log.Println("❌ BUY error:", err)
+					log.Println("BUY error:", err)
 					continue
 				}
 
-				if !waitForFill(broker, price.Symbol, buyOrderId) {
-					log.Println("❌ BUY not filled")
+				buyInfo, ok := waitForExecution(broker, price.Symbol, buyOrderId)
+				if !ok || buyInfo == nil || buyInfo.FilledQty == 0 {
+					log.Println("❌ BUY failed")
 					continue
 				}
 
-				// safer qty (slippage buffer)
-				baseQty := (tradeSize / bestBuyPrice) * 0.995
+				log.Printf("🟢 BUY FILLED: Qty=%.6f Price=%.2f",
+					buyInfo.FilledQty, buyInfo.AvgPrice)
+
+				// IMPORTANT: use ONLY filled qty
+				sellQty := buyInfo.FilledQty
 
 				// SELL
-				sellOrderId, err := broker.MarketSell(price.Symbol, baseQty)
+				sellOrderId, err := broker.MarketSell(price.Symbol, sellQty)
 				if err != nil {
-					log.Println("❌ SELL error:", err)
+					log.Println("SELL error:", err)
 					continue
 				}
 
-				if !waitForFill(broker, price.Symbol, sellOrderId) {
-					log.Println("❌ SELL not filled")
+				sellInfo, ok := waitForExecution(broker, price.Symbol, sellOrderId)
+				if !ok || sellInfo == nil || sellInfo.FilledQty == 0 {
+					log.Println("❌ SELL failed")
 					continue
 				}
 
-				log.Println("✅ TRADE COMPLETED")
+				log.Printf("🔴 SELL FILLED: Qty=%.6f Price=%.2f",
+					sellInfo.FilledQty, sellInfo.AvgPrice)
 
+				// REAL PROFIT
+				realProfit := (sellInfo.AvgPrice - buyInfo.AvgPrice) * sellInfo.FilledQty
+
+				log.Printf("💰 REAL PROFIT: %.4f USDT", realProfit)
 				// -----------------------------
 				// 4. BROADCAST
 				// -----------------------------

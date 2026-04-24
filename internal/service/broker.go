@@ -115,7 +115,16 @@ func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error)
 
 	return resp.Result.OrderId, nil
 }
-func (b *BybitBroker) GetOrderStatus(symbol, orderId string) (string, error) {
+
+type OrderInfo struct {
+	Status       string
+	AvgPrice     float64
+	FilledQty    float64
+	RemainingQty float64
+}
+
+func (b *BybitBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
+
 	params := fmt.Sprintf(
 		"category=spot&symbol=%s&orderId=%s",
 		symbol,
@@ -137,7 +146,7 @@ func (b *BybitBroker) GetOrderStatus(symbol, orderId string) (string, error) {
 
 	resp, err := b.Client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -145,6 +154,9 @@ func (b *BybitBroker) GetOrderStatus(symbol, orderId string) (string, error) {
 		Result struct {
 			List []struct {
 				OrderStatus string `json:"orderStatus"`
+				AvgPrice    string `json:"avgPrice"`
+				CumExecQty  string `json:"cumExecQty"`
+				LeavesQty   string `json:"leavesQty"`
 			} `json:"list"`
 		} `json:"result"`
 	}
@@ -152,35 +164,59 @@ func (b *BybitBroker) GetOrderStatus(symbol, orderId string) (string, error) {
 	json.NewDecoder(resp.Body).Decode(&result)
 
 	if len(result.Result.List) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
-	return result.Result.List[0].OrderStatus, nil
-}
+	o := result.Result.List[0]
 
-func waitForFill(b *BybitBroker, symbol, orderId string) bool {
+	price, _ := strconv.ParseFloat(o.AvgPrice, 64)
+	qty, _ := strconv.ParseFloat(o.CumExecQty, 64)
+	remainingStr := o.LeavesQty // or "leavesQty" depending on API
+
+	remaining, _ := strconv.ParseFloat(remainingStr, 64)
+
+	return &OrderInfo{
+		Status:       o.OrderStatus,
+		AvgPrice:     price,
+		FilledQty:    qty,
+		RemainingQty: remaining,
+	}, nil
+}
+func waitForExecution(b *BybitBroker, symbol, orderId string) (*OrderInfo, bool) {
+
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 
+	var lastInfo *OrderInfo
+
 	for {
 		select {
 		case <-timeout:
-			log.Println("⏰ Order timeout:", orderId)
-			return false
+			log.Println("⏰ Timeout reached")
+			return lastInfo, lastInfo != nil && lastInfo.FilledQty > 0
 
 		case <-ticker.C:
-			status, err := b.GetOrderStatus(symbol, orderId)
-			if err != nil {
+			info, err := b.GetOrderInfo(symbol, orderId)
+			if err != nil || info == nil {
 				continue
 			}
 
-			if status == "Filled" {
-				return true
+			lastInfo = info
+
+			// FULL fill
+			if info.Status == "Filled" {
+				return info, true
 			}
 
-			if status == "Cancelled" || status == "Rejected" {
-				return false
+			// PARTIAL fill
+			if info.FilledQty > 0 {
+				log.Printf("⚠️ Partial fill: %.6f", info.FilledQty)
+			}
+
+			// FAILED
+			if info.Status == "Cancelled" || info.Status == "Rejected" {
+				return info, false
 			}
 		}
 	}
