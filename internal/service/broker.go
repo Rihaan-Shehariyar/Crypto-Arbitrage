@@ -193,8 +193,16 @@ func waitForExecution(b *BybitBroker, symbol, orderId string) (*OrderInfo, bool)
 	for {
 		select {
 		case <-timeout:
-			log.Println("⏰ Timeout reached")
-			return lastInfo, lastInfo != nil && lastInfo.FilledQty > 0
+			log.Println("⏰ Timeout → cancelling order")
+
+			if lastInfo != nil && lastInfo.FilledQty > 0 {
+				// partial fill → cancel rest
+				_ = b.CancelOrder(symbol, orderId)
+				return lastInfo, true
+			}
+
+			_ = b.CancelOrder(symbol, orderId)
+			return nil, false
 
 		case <-ticker.C:
 			info, err := b.GetOrderInfo(symbol, orderId)
@@ -209,7 +217,7 @@ func waitForExecution(b *BybitBroker, symbol, orderId string) (*OrderInfo, bool)
 				return info, true
 			}
 
-			// PARTIAL fill
+			// PARTIAL fill (keep waiting but log)
 			if info.FilledQty > 0 {
 				log.Printf("⚠️ Partial fill: %.6f", info.FilledQty)
 			}
@@ -220,4 +228,22 @@ func waitForExecution(b *BybitBroker, symbol, orderId string) (*OrderInfo, bool)
 			}
 		}
 	}
+}
+
+func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
+
+	body := map[string]interface{}{
+		"category": "spot",
+		"symbol":   symbol,
+		"orderId":  orderId,
+	}
+
+	respBytes, err := b.doPOST("/v5/order/cancel", body)
+	if err != nil {
+		return err
+	}
+
+	log.Println("🛑 Cancel response:", string(respBytes))
+
+	return nil
 }
