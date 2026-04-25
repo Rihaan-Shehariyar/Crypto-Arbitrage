@@ -32,7 +32,7 @@ func NewBybitBroker(key, secret string) *BybitBroker {
 // ---- helpers ----
 
 func (b *BybitBroker) sign(payload string) (timestamp string, signature string) {
-	ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	ts := strconv.FormatInt(time.Now().UnixMilli(), 10) 
 	// v5 signature: sign = HMAC_SHA256(secret, timestamp + apiKey + recvWindow + payload)
 	recvWindow := "5000"
 	raw := ts + b.ApiKey + recvWindow + payload
