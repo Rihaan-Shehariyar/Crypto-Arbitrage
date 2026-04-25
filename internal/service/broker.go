@@ -91,7 +91,9 @@ func (b *BybitBroker) MarketBuy(symbol string, quoteQty float64) (string, error)
 	}
 
 	var resp OrderResponse
-	json.Unmarshal(respBytes, &resp)
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return "", err
+	}
 
 	return resp.Result.OrderId, nil
 }
@@ -111,7 +113,9 @@ func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error)
 	}
 
 	var resp OrderResponse
-	json.Unmarshal(respBytes, &resp)
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return "", err
+	}
 
 	return resp.Result.OrderId, nil
 }
@@ -171,10 +175,11 @@ func (b *BybitBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 
 	price, _ := strconv.ParseFloat(o.AvgPrice, 64)
 	qty, _ := strconv.ParseFloat(o.CumExecQty, 64)
-	remainingStr := o.LeavesQty // or "leavesQty" depending on API
-
+	remainingStr := o.LeavesQty
+	if remainingStr == "" {
+		remainingStr = "0"
+	}
 	remaining, _ := strconv.ParseFloat(remainingStr, 64)
-
 	return &OrderInfo{
 		Status:       o.OrderStatus,
 		AvgPrice:     price,
@@ -246,4 +251,67 @@ func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
 	log.Println("🛑 Cancel response:", string(respBytes))
 
 	return nil
+}
+
+func (b *BybitBroker) GetBalance() (map[string]float64, error) {
+
+	params := "accountType=SPOT"
+
+	ts, sig := b.sign(params)
+
+	req, _ := http.NewRequest(
+		"GET",
+		b.BaseURL+"/v5/account/wallet-balance?"+params,
+		nil,
+	)
+
+	req.Header.Set("X-BAPI-API-KEY", b.ApiKey)
+	req.Header.Set("X-BAPI-SIGN", sig)
+	req.Header.Set("X-BAPI-TIMESTAMP", ts)
+	req.Header.Set("X-BAPI-RECV-WINDOW", "5000")
+
+	resp, err := b.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Result struct {
+			List []struct {
+				Coin []struct {
+					Coin          string `json:"coin"`
+					WalletBalance string `json:"walletBalance"`
+				} `json:"coin"`
+			} `json:"list"`
+		} `json:"result"`
+	}
+
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	balances := make(map[string]float64)
+
+	if len(result.Result.List) == 0 {
+		return balances, nil
+	}
+
+	for _, c := range result.Result.List[0].Coin {
+		val, _ := strconv.ParseFloat(c.WalletBalance, 64)
+		balances[c.Coin] = val
+	}
+
+	return balances, nil
+}
+func clearLeftover(b *BybitBroker, symbol string, qty float64) {
+
+	if qty < 0.00001 {
+		return
+	}
+
+	log.Printf("🧹 Clearing leftover %s: %.6f", symbol, qty)
+
+	_, err := b.MarketSell(symbol, qty)
+	if err != nil {
+		log.Println("❌ Failed to clear leftover:", err)
+	}
 }
