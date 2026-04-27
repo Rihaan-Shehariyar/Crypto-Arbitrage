@@ -24,7 +24,7 @@ func NewBinance(apiKey, secret string) *BinanceBroker {
 	return &BinanceBroker{
 		ApiKey:  apiKey,
 		Secret:  secret,
-		BaseURL: "https://testnet.binance.vision", // testnet
+		BaseURL: "https://testnet.binance.vision",
 		Client:  &http.Client{},
 	}
 }
@@ -44,26 +44,25 @@ func (b *BinanceBroker) sign(query string) string {
 }
 
 //////////////////////////////////////////////////////
-// 🔧 HTTP HELPER
+// 🔧 HTTP REQUEST
 //////////////////////////////////////////////////////
 
-func (b *BinanceBroker) doRequest(method, endpoint string, params string, body []byte) ([]byte, error) {
+func (b *BinanceBroker) doRequest(method, endpoint, params string) ([]byte, error) {
 
 	ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
 	if params != "" {
-		params += "&timestamp=" + ts
+		params += "&timestamp=" + ts + "&recvWindow=5000"
 	} else {
-		params = "timestamp=" + ts
+		params = "timestamp=" + ts + "&recvWindow=5000"
 	}
 
 	signature := b.sign(params)
-	fullURL := b.BaseURL + endpoint + "?" + params + "&signature=" + signature
 
-	req, _ := http.NewRequest(method, fullURL, bytes.NewBuffer(body))
+	url := b.BaseURL + endpoint + "?" + params + "&signature=" + signature
 
+	req, _ := http.NewRequest(method, url, bytes.NewBuffer(nil))
 	req.Header.Set("X-MBX-APIKEY", b.ApiKey)
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := b.Client.Do(req)
 	if err != nil {
@@ -71,11 +70,20 @@ func (b *BinanceBroker) doRequest(method, endpoint string, params string, body [
 	}
 	defer resp.Body.Close()
 
-	return io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+
+	// 🔥 DEBUG (IMPORTANT)
+	fmt.Println("BINANCE RAW:", string(body))
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
 }
 
 //////////////////////////////////////////////////////
-// 🟢 MARKET BUY (quote)
+// 🟢 MARKET BUY (USDT)
 //////////////////////////////////////////////////////
 
 func (b *BinanceBroker) MarketBuy(symbol string, quoteQty float64) (string, error) {
@@ -86,45 +94,72 @@ func (b *BinanceBroker) MarketBuy(symbol string, quoteQty float64) (string, erro
 		quoteQty,
 	)
 
-	respBytes, err := b.doRequest("POST", "/api/v3/order", params, nil)
+	body, err := b.doRequest("POST", "/api/v3/order", params)
 	if err != nil {
 		return "", err
+	}
+
+	// Handle Binance error response
+	var errResp struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+
+	if json.Unmarshal(body, &errResp) == nil && errResp.Code != 0 {
+		return "", fmt.Errorf("binance error: %s", errResp.Msg)
 	}
 
 	var resp struct {
 		OrderID int64 `json:"orderId"`
 	}
 
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
+	if err := json.Unmarshal(body, &resp); err != nil {
 		return "", err
+	}
+
+	if resp.OrderID == 0 {
+		return "", fmt.Errorf("orderId is zero (request failed)")
 	}
 
 	return strconv.FormatInt(resp.OrderID, 10), nil
 }
 
 //////////////////////////////////////////////////////
-// 🔴 MARKET SELL (base qty)
+// 🔴 MARKET SELL
 //////////////////////////////////////////////////////
 
-func (b *BinanceBroker) MarketSell(symbol string, baseQty float64) (string, error) {
+func (b *BinanceBroker) MarketSell(symbol string, qty float64) (string, error) {
 
 	params := fmt.Sprintf(
 		"symbol=%s&side=SELL&type=MARKET&quantity=%.6f",
 		symbol,
-		baseQty,
+		qty,
 	)
 
-	respBytes, err := b.doRequest("POST", "/api/v3/order", params, nil)
+	body, err := b.doRequest("POST", "/api/v3/order", params)
 	if err != nil {
 		return "", err
+	}
+
+	var errResp struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+
+	if json.Unmarshal(body, &errResp) == nil && errResp.Code != 0 {
+		return "", fmt.Errorf("binance error: %s", errResp.Msg)
 	}
 
 	var resp struct {
 		OrderID int64 `json:"orderId"`
 	}
 
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
+	if err := json.Unmarshal(body, &resp); err != nil {
 		return "", err
+	}
+
+	if resp.OrderID == 0 {
+		return "", fmt.Errorf("orderId is zero (request failed)")
 	}
 
 	return strconv.FormatInt(resp.OrderID, 10), nil
@@ -142,7 +177,7 @@ func (b *BinanceBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error)
 		orderId,
 	)
 
-	respBytes, err := b.doRequest("GET", "/api/v3/order", params, nil)
+	body, err := b.doRequest("GET", "/api/v3/order", params)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +188,7 @@ func (b *BinanceBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error)
 		CummulativeQuoteQty string `json:"cummulativeQuoteQty"`
 	}
 
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
+	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, err
 	}
 
@@ -185,7 +220,7 @@ func (b *BinanceBroker) CancelOrder(symbol, orderId string) error {
 		orderId,
 	)
 
-	_, err := b.doRequest("DELETE", "/api/v3/order", params, nil)
+	_, err := b.doRequest("DELETE", "/api/v3/order", params)
 	return err
 }
 
@@ -195,7 +230,7 @@ func (b *BinanceBroker) CancelOrder(symbol, orderId string) error {
 
 func (b *BinanceBroker) GetBalance() (map[string]float64, error) {
 
-	respBytes, err := b.doRequest("GET", "/api/v3/account", "", nil)
+	body, err := b.doRequest("GET", "/api/v3/account", "")
 	if err != nil {
 		return nil, err
 	}
@@ -207,18 +242,18 @@ func (b *BinanceBroker) GetBalance() (map[string]float64, error) {
 		} `json:"balances"`
 	}
 
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
+	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, err
 	}
 
-	balances := make(map[string]float64)
+	result := make(map[string]float64)
 
 	for _, b := range resp.Balances {
 		val, _ := strconv.ParseFloat(b.Free, 64)
 		if val > 0 {
-			balances[b.Asset] = val
+			result[b.Asset] = val
 		}
 	}
 
-	return balances, nil
+	return result, nil
 }

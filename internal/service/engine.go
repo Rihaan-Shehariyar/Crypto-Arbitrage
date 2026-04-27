@@ -22,6 +22,8 @@ type Opportunity struct {
 
 var lastTradeTime = make(map[string]int64)
 
+const DRY_RUN = true
+
 func StartEngine(
 	ctx context.Context,
 	f *feed.Feed,
@@ -54,7 +56,7 @@ func StartEngine(
 				now := time.Now().UnixMilli()
 
 				var bestBuy, bestSell feed.Price
-				bestPercent := 0.0
+				bestPercent := -999.0
 
 				// -----------------------------
 				// 1. FIND BEST CROSS-EXCHANGE
@@ -70,7 +72,11 @@ func StartEngine(
 							continue
 						}
 
-						profit := (sell.Bid*(1-fee) - buy.Ask*(1+fee))
+						// TEMP TEST
+
+						adjustedSellBid := sell.Bid * 1.002 // +0.2% fake boost
+
+						profit := (adjustedSellBid*(1-fee) - buy.Ask*(1+fee))
 						percent := (profit / buy.Ask) * 100
 
 						if percent > bestPercent {
@@ -81,10 +87,26 @@ func StartEngine(
 					}
 				}
 
+				// log.Printf("DEBUG %s | %s | Bid: %.2f Ask: %.2f",
+				// 	price.Symbol,
+				// 	price.Exchange,
+				// 	price.Bid,
+				// 	price.Ask,
+				// )
+
+				// log.Printf("SPREAD %s | %s→%s = %.4f%%",
+				// 	price.Symbol,
+				// 	bestBuy.Exchange,
+				// 	bestSell.Exchange,
+				// 	bestPercent,
+				// )
+
+				// log.Printf("BOOK %s → %+v", price.Symbol, priceBook[price.Symbol])
+
 				// -----------------------------
 				// 2. VALIDATION
 				// -----------------------------
-				if bestPercent < 0.2 {
+				if bestPercent < 0.05 {
 					continue
 				}
 
@@ -120,6 +142,10 @@ func StartEngine(
 
 				sellBal, err := sellBroker.GetBalance()
 				if err != nil {
+					continue
+				}
+				if DRY_RUN {
+					log.Println("🧪 DRY RUN → skipping execution")
 					continue
 				}
 
@@ -191,6 +217,7 @@ func StartEngine(
 					Profit:    profit,
 					Percent:   bestPercent,
 				})
+
 			}
 		}
 	}()

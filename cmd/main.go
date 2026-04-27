@@ -16,9 +16,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+
+	godotenv.Load()
 
 	// -----------------------------
 	// 🧠 Context (for shutdown)
@@ -74,6 +77,19 @@ func main() {
 		os.Getenv("KUCOIN_PASSPHRASE"),
 	)
 
+	// TEST BLOCK (remove later)
+	log.Println("🧪 Testing Binance Market Buy...")
+
+	orderId, err := binanceBroker.MarketBuy("BTCUSDT", 10)
+	if err != nil {
+		log.Println("BUY error:", err)
+	} else {
+		log.Println("BUY order placed:", orderId)
+	}
+
+	balance, _ := binanceBroker.GetBalance()
+	log.Println("BALANCE AFTER BUY:", balance)
+
 	// -----------------------------
 	// 🧩 Broker map (IMPORTANT)
 	// -----------------------------
@@ -105,6 +121,7 @@ func main() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %s\n", err)
 		}
+
 	}()
 
 	// -----------------------------
