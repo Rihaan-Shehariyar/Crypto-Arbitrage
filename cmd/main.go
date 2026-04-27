@@ -77,18 +77,53 @@ func main() {
 		os.Getenv("KUCOIN_PASSPHRASE"),
 	)
 
-	// TEST BLOCK (remove later)
+	// =======================
+	// 🧪 TEST BLOCK (REMOVE LATER)
+	// =======================
+
 	log.Println("🧪 Testing Binance Market Buy...")
 
-	orderId, err := binanceBroker.MarketBuy("BTCUSDT", 10)
+	buyOrderId, err := binanceBroker.MarketBuy("BTCUSDT", 10)
 	if err != nil {
 		log.Println("BUY error:", err)
 	} else {
-		log.Println("BUY order placed:", orderId)
+		log.Println("BUY order placed:", buyOrderId)
 	}
 
+	// ⏳ small delay to ensure fill
+	time.Sleep(500 * time.Millisecond)
+
+	// 🔍 fetch filled info
+	buyInfo, err := binanceBroker.GetOrderInfo("BTCUSDT", buyOrderId)
+	if err != nil {
+		log.Println("BUY info error:", err)
+	} else {
+		log.Printf("BUY FILLED: qty=%.6f avgPrice=%.2f",
+			buyInfo.FilledQty,
+			buyInfo.AvgPrice,
+		)
+	}
+
+	// =======================
+	// 🔴 SELL TEST
+	// =======================
+
+	log.Println("🧪 Testing SELL...")
+
+	sellOrderId, err := binanceBroker.MarketSell("BTCUSDT", buyInfo.FilledQty)
+	if err != nil {
+		log.Println("SELL error:", err)
+	} else {
+		log.Println("SELL order placed:", sellOrderId)
+	}
+
+	// check final balance
 	balance, _ := binanceBroker.GetBalance()
-	log.Println("BALANCE AFTER BUY:", balance)
+	log.Println("BALANCE AFTER SELL:", balance)
+
+	// =======================
+	// END TEST BLOCK
+	// =======================
 
 	// -----------------------------
 	// 🧩 Broker map (IMPORTANT)
