@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto-arbitrage/broker"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/websocket"
 	"log"
@@ -19,18 +20,24 @@ type Opportunity struct {
 	Percent   float64 `json:"percent"`
 }
 
-var lastOpportunity = make(map[string]float64)
 var lastTradeTime = make(map[string]int64)
 
-func StartEngine(ctx context.Context, f *feed.Feed, broker *BybitBroker) {
+func StartEngine(
+	ctx context.Context,
+	f *feed.Feed,
+	brokers map[string]broker.Broker,
+) {
+
 	go func() {
-		log.Println("[ENGINE] started")
+
+		log.Println("[ENGINE] Multi-exchange started")
 
 		fee := 0.001
 		tradeSize := 100.0
 
 		for {
 			select {
+
 			case <-ctx.Done():
 				log.Println("[ENGINE] shutting down...")
 				return
@@ -39,220 +46,152 @@ func StartEngine(ctx context.Context, f *feed.Feed, broker *BybitBroker) {
 
 				UpdatePrice(price)
 
-				books := feed.GetOrderBooks(price.Symbol)
-				if len(books) < 2 {
+				prices := GetPrices(price.Symbol)
+				if len(prices) < 2 {
 					continue
 				}
 
 				now := time.Now().UnixMilli()
 
-				bestProfit := 0.0
+				var bestBuy, bestSell feed.Price
 				bestPercent := 0.0
 
-				var bestBuyEx, bestSellEx string
-				var bestBuyPrice, bestSellPrice float64
-
 				// -----------------------------
-				// 1. FIND OPPORTUNITY
+				// 1. FIND BEST CROSS-EXCHANGE
 				// -----------------------------
-				for buyEx, buyBook := range books {
-					for sellEx, sellBook := range books {
+				for _, buy := range prices {
+					for _, sell := range prices {
 
-						if buyEx == sellEx {
+						if buy.Exchange == sell.Exchange {
 							continue
 						}
 
-						if now-buyBook.Time > 2000 || now-sellBook.Time > 2000 {
+						if now-buy.Time > 2000 || now-sell.Time > 2000 {
 							continue
 						}
 
-						if len(buyBook.Asks) == 0 || len(sellBook.Bids) == 0 {
-							continue
-						}
-
-						buyPrice, amount := simulateBuy(buyBook.Asks, tradeSize)
-						if buyPrice == 0 || amount == 0 {
-							continue
-						}
-
-						sellPrice := simulateSell(sellBook.Bids, amount)
-						if sellPrice == 0 {
-							continue
-						}
-
-						profit := (sellPrice*(1-fee) - buyPrice*(1+fee)) * amount
-						percent := (profit / tradeSize) * 100
+						profit := (sell.Bid*(1-fee) - buy.Ask*(1+fee))
+						percent := (profit / buy.Ask) * 100
 
 						if percent > bestPercent {
 							bestPercent = percent
-							bestProfit = profit
-							bestBuyEx = buyEx
-							bestSellEx = sellEx
-							bestBuyPrice = buyPrice
-							bestSellPrice = sellPrice
+							bestBuy = buy
+							bestSell = sell
 						}
 					}
 				}
 
 				// -----------------------------
-				// 2. VALIDATE
+				// 2. VALIDATION
 				// -----------------------------
-				if bestPercent < 0.1 {
-					continue
-				}
-
-				if bestBuyEx == "" || bestSellEx == "" {
-					continue
-				}
-
-				// TEMP restriction
-				if bestBuyEx != "bybit" || bestSellEx != "bybit" {
+				if bestPercent < 0.2 {
 					continue
 				}
 
 				key := price.Symbol
 
-				if abs(lastOpportunity[key]-bestPercent) < 0.001 {
-					continue
-				}
-				lastOpportunity[key] = bestPercent
-
-				if now-lastTradeTime[key] < 3000 {
+				if now-lastTradeTime[key] < 5000 {
 					continue
 				}
 				lastTradeTime[key] = now
 
+				buyBroker := brokers[bestBuy.Exchange]
+				sellBroker := brokers[bestSell.Exchange]
+
+				if buyBroker == nil || sellBroker == nil {
+					continue
+				}
+
 				log.Printf(
-					"🚀 %s | $%.0f | BUY %s → SELL %s | Profit: $%.2f (%.3f%%)",
+					"🚀 ARB %s | BUY %s → SELL %s | %.3f%%",
 					price.Symbol,
-					tradeSize,
-					bestBuyEx,
-					bestSellEx,
-					bestProfit,
+					bestBuy.Exchange,
+					bestSell.Exchange,
 					bestPercent,
 				)
 
 				// -----------------------------
-				// 3. EXECUTION
+				// 3. BALANCE CHECK
 				// -----------------------------
-				log.Println("⚡ Executing trade...")
-
-				before, err := broker.GetBalance()
+				buyBal, err := buyBroker.GetBalance()
 				if err != nil {
-					log.Println("❌ Failed to fetch balance before trade")
 					continue
 				}
 
-				if before["USDT"] < tradeSize {
-					log.Println("❌ Not enough USDT")
+				sellBal, err := sellBroker.GetBalance()
+				if err != nil {
 					continue
 				}
+
+				baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
+
+				if buyBal["USDT"] < tradeSize {
+					log.Println("❌ Not enough USDT on BUY exchange")
+					continue
+				}
+
+				estimatedQty := tradeSize / bestBuy.Ask
+
+				if sellBal[baseAsset] < estimatedQty {
+					log.Println("❌ Not enough asset on SELL exchange")
+					continue
+				}
+
+				// -----------------------------
+				// 4. EXECUTION
+				// -----------------------------
+				log.Println("⚡ Executing arbitrage...")
 
 				// BUY
-				buyOrderId, err := broker.MarketBuy(price.Symbol, tradeSize)
+				buyOrderId, err := buyBroker.MarketBuy(price.Symbol, tradeSize)
 				if err != nil {
 					log.Println("BUY error:", err)
 					continue
 				}
 
-				buyInfo, ok := waitForExecution(broker, price.Symbol, buyOrderId)
-				if !ok || buyInfo == nil || buyInfo.FilledQty == 0 {
+				buyInfo, ok := waitForExecution(buyBroker, price.Symbol, buyOrderId)
+				if !ok || buyInfo.FilledQty == 0 {
 					log.Println("❌ BUY failed")
 					continue
 				}
 
-				log.Printf("🟢 BUY FILLED: Qty=%.6f Price=%.2f",
-					buyInfo.FilledQty, buyInfo.AvgPrice)
-
-				if buyInfo.FilledQty <= 0 {
-					log.Println("❌ Nothing to sell")
-					continue
-				}
+				log.Printf("🟢 BUY filled %.6f", buyInfo.FilledQty)
 
 				// SELL
-				sellOrderId, err := broker.MarketSell(price.Symbol, buyInfo.FilledQty)
+				sellOrderId, err := sellBroker.MarketSell(price.Symbol, buyInfo.FilledQty)
 				if err != nil {
 					log.Println("SELL error:", err)
 					continue
 				}
 
-				sellInfo, ok := waitForExecution(broker, price.Symbol, sellOrderId)
-				if !ok || sellInfo == nil || sellInfo.FilledQty == 0 {
+				sellInfo, ok := waitForExecution(sellBroker, price.Symbol, sellOrderId)
+				if !ok || sellInfo.FilledQty == 0 {
 					log.Println("❌ SELL failed")
 					continue
 				}
 
-				log.Printf("🔴 SELL FILLED: Qty=%.6f Price=%.2f",
-					sellInfo.FilledQty, sellInfo.AvgPrice)
+				log.Printf("🔴 SELL filled %.6f", sellInfo.FilledQty)
 
 				// -----------------------------
-				// 4. BALANCE TRACKING
+				// 5. REAL PROFIT
 				// -----------------------------
-				after, err := broker.GetBalance()
-				if err != nil {
-					log.Println("❌ Failed to fetch balance after trade")
-					continue
-				}
+				profit := (sellInfo.AvgPrice*(1-fee) - buyInfo.AvgPrice*(1+fee)) * sellInfo.FilledQty
 
-				log.Println("💼 WALLET BALANCE:")
-				for coin, val := range after {
-					if val > 0 {
-						log.Printf("   %s: %.6f", coin, val)
-					}
-				}
-
-				log.Println("📊 BALANCE CHANGE:")
-
-				baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
-
-				for coin, afterVal := range after {
-
-					beforeVal := before[coin]
-					diff := afterVal - beforeVal
-
-					// ONLY clear traded asset
-					if coin == baseAsset && afterVal > 0.00001 {
-						log.Printf("⚠️ LEFTOVER %s: %.6f", coin, afterVal)
-
-						symbol := coin + "USDT"
-						clearLeftover(broker, symbol, afterVal)
-					}
-
-					if abs(diff) > 0.000001 {
-						log.Printf("%s: %.6f → %.6f (Δ %.6f)", coin, beforeVal, afterVal, diff)
-					}
-				}
-
-				// TRUE wallet PnL
-				usdtDiff := after["USDT"] - before["USDT"]
-				log.Printf("💵 WALLET USDT CHANGE: %.4f", usdtDiff)
-
-				// CALCULATED PnL
-				realProfit := (sellInfo.AvgPrice*(1-fee) - buyInfo.AvgPrice*(1+fee)) * sellInfo.FilledQty
-				log.Printf("💰 CALCULATED PROFIT: %.4f USDT", realProfit)
+				log.Printf("💰 REAL PROFIT: %.4f USDT", profit)
 
 				// -----------------------------
-				// 5. BROADCAST
+				// 6. BROADCAST
 				// -----------------------------
-				result := Opportunity{
+				websocket.Broadcast(Opportunity{
 					Coin:      price.Symbol,
-					BuyFrom:   bestBuyEx,
-					SellTo:    bestSellEx,
-					BuyPrice:  bestBuyPrice,
-					SellPrice: bestSellPrice,
-					Profit:    bestProfit,
+					BuyFrom:   bestBuy.Exchange,
+					SellTo:    bestSell.Exchange,
+					BuyPrice:  buyInfo.AvgPrice,
+					SellPrice: sellInfo.AvgPrice,
+					Profit:    profit,
 					Percent:   bestPercent,
-				}
-
-				websocket.Broadcast(result)
+				})
 			}
 		}
 	}()
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }

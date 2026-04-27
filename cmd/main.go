@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto-arbitrage/broker"
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
@@ -18,40 +19,79 @@ import (
 )
 
 func main() {
-	r := gin.Default()
 
+	// -----------------------------
+	// 🧠 Context (for shutdown)
+	// -----------------------------
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	//  NEW SYSTEM
+	// -----------------------------
+	// 📡 Feed (shared stream)
+	// -----------------------------
 	f := feed.NewFeed()
 
-	binance := exchange.BinanceWS{}
-	binance.Start(f, []string{
+	// -----------------------------
+	// 🔌 WebSocket feeds (market data)
+	// -----------------------------
+	binanceWS := exchange.BinanceWS{}
+	binanceWS.Start(f, []string{
 		"BTCUSDT",
 		"ETHUSDT",
 		"SOLUSDT",
 	})
 
-	bybit := exchange.BybitWS{}
-	bybit.Start(f, []string{
+	bybitWS := exchange.BybitWS{}
+	bybitWS.Start(f, []string{
 		"BTCUSDT",
 		"ETHUSDT",
 		"SOLUSDT",
 	})
 
-	kucoin := exchange.KucoinWS{}
-	kucoin.Start(f, []string{
+	kucoinWS := exchange.KucoinWS{}
+	kucoinWS.Start(f, []string{
 		"BTC-USDT",
 		"ETH-USDT",
 		"SOL-USDT",
 	})
 
-	broker := service.NewBybitBroker(
+	// -----------------------------
+	// 🏦 Brokers (trading layer)
+	// -----------------------------
+	bybitBroker := broker.NewBybit(
 		os.Getenv("BYBIT_KEY"),
 		os.Getenv("BYBIT_SECRET"),
 	)
 
-	service.StartEngine(ctx, f, broker)
+	binanceBroker := broker.NewBinance(
+		os.Getenv("BINANCE_KEY"),
+		os.Getenv("BINANCE_SECRET"),
+	)
+
+	kucoinBroker := broker.NewKucoin(
+		os.Getenv("KUCOIN_KEY"),
+		os.Getenv("KUCOIN_SECRET"),
+		os.Getenv("KUCOIN_PASSPHRASE"),
+	)
+
+	// -----------------------------
+	// 🧩 Broker map (IMPORTANT)
+	// -----------------------------
+	brokers := map[string]broker.Broker{
+		"bybit":   bybitBroker,
+		"binance": binanceBroker,
+		"kucoin":  kucoinBroker,
+	}
+
+	// -----------------------------
+	// ⚙️ Start Engine
+	// -----------------------------
+	service.StartEngine(ctx, f, brokers)
+
+	// -----------------------------
+	// 🌐 HTTP + WebSocket Server
+	// -----------------------------
+	r := gin.Default()
 
 	r.GET("/ws", handler.HandleWebSocket)
 
@@ -61,29 +101,32 @@ func main() {
 	}
 
 	go func() {
-		log.Println("Server Started running on :8080")
+		log.Println("🚀 Server running on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen : %s\n", err)
+			log.Fatalf("Server error: %s\n", err)
 		}
 	}()
 
+	// -----------------------------
+	// 🛑 Graceful Shutdown
+	// -----------------------------
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	<-quit
 	log.Println("🛑 Shutdown signal received")
 
-	cancel()
+	cancel() // stop engine
 
 	ctxTimeout, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelTimeout()
 
 	if err := srv.Shutdown(ctxTimeout); err != nil {
-		log.Fatal("Server forced to shutdown:", err)
+		log.Fatal("Server forced shutdown:", err)
 	}
 
 	log.Println("🔌 Closing WebSocket connections...")
 	websocket.CloseAll()
 
-	log.Println(" Server exited gracefully")
+	log.Println("✅ Server exited gracefully")
 }
