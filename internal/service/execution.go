@@ -88,6 +88,11 @@ func waitForExecution(
 
 				fillRatio := lastInfo.FilledQty / expectedQty
 
+				if fillRatio < 0.9 {
+					log.Println("❌ BUY partial too small → skip")
+					continue
+				}
+
 				log.Printf("⚠️ Partial fill ratio: %.2f%%",
 					fillRatio*100,
 				)
