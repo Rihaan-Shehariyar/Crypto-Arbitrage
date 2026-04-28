@@ -58,9 +58,8 @@ func StartEngine(
 				var bestBuy, bestSell feed.Price
 				bestPercent := -999.0
 
-				// -----------------------------
 				// 1. FIND BEST CROSS-EXCHANGE
-				// -----------------------------
+
 				for _, buy := range prices {
 					for _, sell := range prices {
 
@@ -103,10 +102,9 @@ func StartEngine(
 
 				// log.Printf("BOOK %s → %+v", price.Symbol, priceBook[price.Symbol])
 
-				// -----------------------------
 				// 2. VALIDATION
-				// -----------------------------
-				if bestPercent < 0.05 {
+
+				if bestPercent < 0.01 {
 					continue
 				}
 
@@ -175,13 +173,22 @@ func StartEngine(
 					continue
 				}
 
-				buyInfo, ok := waitForExecution(buyBroker, price.Symbol, buyOrderId)
+				expectedQty := tradeSize / bestBuy.Ask
+
+				buyInfo, ok := waitForExecution(buyBroker, price.Symbol, buyOrderId, expectedQty)
 				if !ok || buyInfo.FilledQty == 0 {
 					log.Println("❌ BUY failed")
 					continue
 				}
 
-				log.Printf("🟢 BUY filled %.6f", buyInfo.FilledQty)
+				log.Printf("🟢 BUY filled qty=%.6f price=%.2f",
+					buyInfo.FilledQty,
+					buyInfo.AvgPrice,
+				)
+
+				if buyInfo.FilledQty*bestBuy.Bid < 10 {
+					log.Println("❌ Too small after fill (NOTIONAL fail)")
+				}
 
 				// SELL
 				sellOrderId, err := sellBroker.MarketSell(price.Symbol, buyInfo.FilledQty)
@@ -190,14 +197,16 @@ func StartEngine(
 					continue
 				}
 
-				sellInfo, ok := waitForExecution(sellBroker, price.Symbol, sellOrderId)
+				sellInfo, ok := waitForExecution(sellBroker, price.Symbol, sellOrderId, buyInfo.FilledQty)
 				if !ok || sellInfo.FilledQty == 0 {
 					log.Println("❌ SELL failed")
 					continue
 				}
 
-				log.Printf("🔴 SELL filled %.6f", sellInfo.FilledQty)
-
+				log.Printf("🔴 SELL filled qty=%.6f price=%.2f",
+					sellInfo.FilledQty,
+					sellInfo.AvgPrice,
+				)
 				// -----------------------------
 				// 5. REAL PROFIT
 				// -----------------------------
