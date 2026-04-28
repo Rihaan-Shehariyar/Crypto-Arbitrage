@@ -23,7 +23,7 @@ type Opportunity struct {
 var lastTradeTime = make(map[string]int64)
 var openPositions = make(map[string]bool)
 
-const DRY_RUN = true
+// const DRY_RUN = true
 
 func StartEngine(
 	ctx context.Context,
@@ -37,7 +37,7 @@ func StartEngine(
 		fee := 0.001
 		slippage := 0.001
 		tradeSize := 100.0
-		minProfit := 0.2 // %
+		// minProfit := 0.2 // %
 
 		for {
 			select {
@@ -96,7 +96,11 @@ func StartEngine(
 				// -----------------------------
 				// 2. VALIDATION
 				// -----------------------------
-				if bestPercent < minProfit {
+				// if bestPercent < minProfit {
+				// 	continue
+				// }
+
+				if bestPercent < -100 {
 					continue
 				}
 
@@ -122,6 +126,16 @@ func StartEngine(
 					bestPercent,
 				)
 
+				websocket.Broadcast(Opportunity{
+					Coin:      price.Symbol,
+					BuyFrom:   bestBuy.Exchange,
+					SellTo:    bestSell.Exchange,
+					BuyPrice:  bestBuy.Ask,
+					SellPrice: bestSell.Bid,
+					Profit:    0, // not executed yet
+					Percent:   bestPercent,
+				})
+
 				// -----------------------------
 				// 3. BALANCE CHECK
 				// -----------------------------
@@ -135,10 +149,10 @@ func StartEngine(
 					continue
 				}
 
-				if DRY_RUN {
-					log.Println("🧪 DRY RUN → skipping execution")
-					continue
-				}
+				// if DRY_RUN {
+				// 	log.Println("🧪 DRY RUN → skipping execution")
+				// 	continue
+				// }
 
 				baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
 

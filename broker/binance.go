@@ -73,7 +73,7 @@ func (b *BinanceBroker) doRequest(method, endpoint, params string) ([]byte, erro
 	body, _ := io.ReadAll(resp.Body)
 
 	// 🔥 DEBUG (IMPORTANT)
-	fmt.Println("BINANCE RAW:", string(body))
+	// fmt.Println("BINANCE RAW:", string(body))
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, string(body))
