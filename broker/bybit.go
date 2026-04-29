@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,7 +20,6 @@ type BybitBroker struct {
 	BaseURL string
 	Client  *http.Client
 }
-
 
 func NewBybit(apiKey, secret string) *BybitBroker {
 	return &BybitBroker{
@@ -221,8 +221,7 @@ func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
 
 func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 
-	query := "accountType=SPOT"
-
+	query := "accountType=UNIFIED"
 	ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	signature := b.sign(query, ts)
 
@@ -238,6 +237,9 @@ func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	log.Println("BYBIT BALANCE RAW:", string(body))
 
 	var result struct {
 		Result struct {

@@ -145,6 +145,7 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/ws", handler.HandleWebSocket)
+	r.GET("/balance", handler.GetBalanceHandler(brokers))
 
 	srv := &http.Server{
 		Addr:    ":8080",

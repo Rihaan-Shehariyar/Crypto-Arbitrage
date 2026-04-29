@@ -7,6 +7,18 @@ export default function useWebSocket(url) {
   useEffect(() => {
     const ws = new WebSocket(url);
 
+    ws.onopen = () => {
+      console.log("✅ WebSocket connected");
+    };
+
+    ws.onclose = () => {
+      console.log("❌ WebSocket disconnected");
+    };
+
+    ws.onerror = (err) => {
+      console.log("⚠️ WS error:", err);
+    };
+
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
 
