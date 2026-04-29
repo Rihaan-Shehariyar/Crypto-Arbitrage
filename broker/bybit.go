@@ -34,10 +34,7 @@ func (b *BybitBroker) Name() string {
 	return "bybit"
 }
 
-//////////////////////////////////////////////////////
-// 🔐 SIGNING
-//////////////////////////////////////////////////////
-
+//  SIGNING
 func (b *BybitBroker) sign(payload string, ts string) string {
 	message := ts + b.ApiKey + "5000" + payload
 
@@ -47,9 +44,8 @@ func (b *BybitBroker) sign(payload string, ts string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-//////////////////////////////////////////////////////
 // 🔧 HTTP HELPER
-//////////////////////////////////////////////////////
+
 
 func (b *BybitBroker) doPOST(endpoint string, body map[string]interface{}) ([]byte, error) {
 
@@ -76,9 +72,7 @@ func (b *BybitBroker) doPOST(endpoint string, body map[string]interface{}) ([]by
 	return io.ReadAll(resp.Body)
 }
 
-//////////////////////////////////////////////////////
-// 🟢 MARKET BUY
-//////////////////////////////////////////////////////
+//  MARKET BUY
 
 func (b *BybitBroker) MarketBuy(symbol string, quoteQty float64) (string, error) {
 
@@ -111,9 +105,8 @@ func (b *BybitBroker) MarketBuy(symbol string, quoteQty float64) (string, error)
 	return resp.Result.OrderID, nil
 }
 
-//////////////////////////////////////////////////////
-// 🔴 MARKET SELL
-//////////////////////////////////////////////////////
+//  MARKET SELL
+
 
 func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error) {
 
@@ -144,9 +137,8 @@ func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error)
 	return resp.Result.OrderID, nil
 }
 
-//////////////////////////////////////////////////////
-// 📊 ORDER INFO
-//////////////////////////////////////////////////////
+//  ORDER INFO
+
 
 func (b *BybitBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 
@@ -199,9 +191,7 @@ func (b *BybitBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 	}, nil
 }
 
-//////////////////////////////////////////////////////
-// ❌ CANCEL ORDER
-//////////////////////////////////////////////////////
+//  CANCEL ORDER
 
 func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
 
@@ -215,9 +205,8 @@ func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
 	return err
 }
 
-//////////////////////////////////////////////////////
-// 💼 BALANCE
-//////////////////////////////////////////////////////
+//  BALANCE
+
 
 func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 
@@ -237,12 +226,13 @@ func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	body, _ := io.ReadAll(resp.Body)
 	log.Println("BYBIT BALANCE RAW:", string(body))
 
 	var result struct {
-		Result struct {
+		RetCode int    `json:"retCode"`
+		RetMsg  string `json:"retMsg"`
+		Result  struct {
 			List []struct {
 				Coin []struct {
 					Coin          string `json:"coin"`
@@ -252,19 +242,26 @@ func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 		} `json:"result"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 
+	log.Println("LIST LENGTH:", len(result.Result.List))
+
 	balances := make(map[string]float64)
 
-	if len(result.Result.List) == 0 {
-		return balances, nil
-	}
+	for _, acc := range result.Result.List {
+		for _, c := range acc.Coin {
 
-	for _, c := range result.Result.List[0].Coin {
-		val, _ := strconv.ParseFloat(c.WalletBalance, 64)
-		balances[c.Coin] = val
+			val, err := strconv.ParseFloat(c.WalletBalance, 64)
+			if err != nil {
+				continue
+			}
+
+			if val > 0 {
+				balances[c.Coin] = val
+			}
+		}
 	}
 
 	return balances, nil

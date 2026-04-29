@@ -5,8 +5,8 @@ import (
 	"crypto-arbitrage/broker"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/websocket"
+	"fmt"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -65,9 +65,7 @@ func StartEngine(
 				var bestBuy, bestSell feed.Price
 				bestPercent := -999.0
 
-				// -----------------------------
 				// 1. FIND BEST OPPORTUNITY
-				// -----------------------------
 				for _, buy := range prices {
 					for _, sell := range prices {
 
@@ -93,14 +91,13 @@ func StartEngine(
 					}
 				}
 
-				// -----------------------------
 				// 2. VALIDATION
-				// -----------------------------
+
 				// if bestPercent < minProfit {
 				// 	continue
 				// }
 
-				if bestPercent < -100 {
+				if bestPercent < 0.0 {
 					continue
 				}
 
@@ -119,7 +116,7 @@ func StartEngine(
 				}
 
 				log.Printf(
-					"🚀 ARB %s | BUY %s → SELL %s | %.3f%%",
+					"ARB %s | BUY %s → SELL %s | %.3f%%",
 					price.Symbol,
 					bestBuy.Exchange,
 					bestSell.Exchange,
@@ -136,45 +133,41 @@ func StartEngine(
 					Percent:   bestPercent,
 				})
 
-				// -----------------------------
 				// 3. BALANCE CHECK
-				// -----------------------------
-				buyBal, err := buyBroker.GetBalance()
-				if err != nil {
-					continue
-				}
-
-				sellBal, err := sellBroker.GetBalance()
-				if err != nil {
-					continue
-				}
-
-				// if DRY_RUN {
-				// 	log.Println("🧪 DRY RUN → skipping execution")
+				// buyBal, err := buyBroker.GetBalance()
+				// if err != nil {
 				// 	continue
 				// }
 
-				baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
+				// sellBal, err := sellBroker.GetBalance()
+				// if err != nil {
+				// 	continue
+				// }
 
-				if buyBal["USDT"] < tradeSize {
-					log.Println("❌ Not enough USDT on BUY exchange")
-					continue
-				}
+				// // if DRY_RUN {
+				// // 	log.Println("DRY RUN → skipping execution")
+				// // 	continue
+				// // }
 
-				estimatedQty := tradeSize / bestBuy.Ask
+				// baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
 
-				if sellBal[baseAsset] < estimatedQty {
-					log.Println("❌ Not enough asset on SELL exchange")
-					continue
-				}
+				// if buyBal["USDT"] < tradeSize {
+				// 	log.Println("Not enough USDT on BUY exchange")
+				// 	continue
+				// }
+
+				// estimatedQty := tradeSize / bestBuy.Ask
+
+				// if sellBal[baseAsset] < estimatedQty {
+				// 	log.Println("Not enough asset on SELL exchange")
+				// 	continue
+				// }
 
 				// lock position
 				openPositions[price.Symbol] = true
 
-				// -----------------------------
 				// 4. EXECUTION
-				// -----------------------------
-				log.Println("⚡ Executing arbitrage...")
+				log.Println("Executing arbitrage...")
 
 				// BUY
 				buyOrderId, err := buyBroker.MarketBuy(price.Symbol, tradeSize)
@@ -194,19 +187,29 @@ func StartEngine(
 				)
 
 				if !ok || buyInfo.FilledQty == 0 {
-					log.Println("❌ BUY failed")
+
+					log.Println("BUY failed")
+
+					AddTrade(Trade{
+						ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
+						Coin:   price.Symbol,
+						Status: "BUY_FAILED",
+						Error:  "timeout or no fill",
+						Time:   time.Now(),
+					})
+
 					openPositions[price.Symbol] = false
 					continue
 				}
 
-				log.Printf("🟢 BUY filled qty=%.6f price=%.2f",
+				log.Printf("BUY filled qty=%.6f price=%.2f",
 					buyInfo.FilledQty,
 					buyInfo.AvgPrice,
 				)
 
 				// NOTIONAL CHECK
 				if buyInfo.FilledQty*bestBuy.Bid < 10 {
-					log.Println("❌ Too small → skipping SELL")
+					log.Println("Too small → skipping SELL")
 					openPositions[price.Symbol] = false
 					continue
 				}
@@ -229,21 +232,30 @@ func StartEngine(
 					buyInfo.FilledQty,
 				)
 
-				// -----------------------------
 				// 5. FAIL-SAFE SELL
-				// -----------------------------
 				if !ok || sellInfo.FilledQty == 0 {
 
-					log.Println("⚠️ SELL failed → retrying...")
+					log.Println("SELL failed → retrying...")
+
+					AddTrade(Trade{
+						ID:      fmt.Sprintf("%d", time.Now().UnixNano()),
+						Coin:    price.Symbol,
+						Status:  "SELL_FAILED",
+						BuyFrom: bestBuy.Exchange,
+						SellTo:  bestSell.Exchange,
+						Qty:     buyInfo.FilledQty,
+						Error:   "sell failed after retry",
+						Time:    time.Now(),
+					})
 
 					sellOrderId, err = sellBroker.MarketSell(
 						price.Symbol,
 						buyInfo.FilledQty,
 					)
 					if err != nil {
-						log.Println("❌ SELL retry failed")
+						log.Println("SELL retry failed")
 
-						log.Println("🚨 Emergency exit on BUY exchange")
+						log.Println("Emergency exit on BUY exchange")
 						_, _ = buyBroker.MarketSell(
 							price.Symbol,
 							buyInfo.FilledQty,
@@ -261,7 +273,7 @@ func StartEngine(
 					)
 
 					if !ok || sellInfo.FilledQty == 0 {
-						log.Println("🚨 SELL retry failed → force exit")
+						log.Println("SELL retry failed → force exit")
 						_, _ = buyBroker.MarketSell(
 							price.Symbol,
 							buyInfo.FilledQty,
@@ -272,33 +284,39 @@ func StartEngine(
 					}
 				}
 
-				log.Printf("🔴 SELL filled qty=%.6f price=%.2f",
+				log.Printf("SELL filled qty=%.6f price=%.2f",
 					sellInfo.FilledQty,
 					sellInfo.AvgPrice,
 				)
 
-				// -----------------------------
 				// 6. REAL PROFIT
-				// -----------------------------
 				profit := (sellInfo.AvgPrice*(1-fee) -
 					buyInfo.AvgPrice*(1+fee)) * sellInfo.FilledQty
 
-				log.Printf("💰 REAL PROFIT: %.4f USDT", profit)
+				log.Printf("REAL PROFIT: %.4f USDT", profit)
 
 				// unlock position
 				openPositions[price.Symbol] = false
 
-				// -----------------------------
-				// 7. BROADCAST
-				// -----------------------------
-				websocket.Broadcast(Opportunity{
+				trade := Trade{
+					ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 					Coin:      price.Symbol,
 					BuyFrom:   bestBuy.Exchange,
 					SellTo:    bestSell.Exchange,
 					BuyPrice:  buyInfo.AvgPrice,
 					SellPrice: sellInfo.AvgPrice,
+					Qty:       sellInfo.FilledQty,
 					Profit:    profit,
 					Percent:   bestPercent,
+					Time:      time.Now(),
+				}
+
+				AddTrade(trade)
+				// 7. BROADCAST
+				websocket.Broadcast(map[string]interface{}{
+					"type":  "trade",
+					"data":  trade,
+					"total": GetTotalPnL(),
 				})
 			}
 		}

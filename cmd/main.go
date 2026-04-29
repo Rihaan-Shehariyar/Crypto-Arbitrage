@@ -23,20 +23,11 @@ func main() {
 
 	godotenv.Load()
 
-	// -----------------------------
-	// 🧠 Context (for shutdown)
-	// -----------------------------
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// -----------------------------
-	// 📡 Feed (shared stream)
-	// -----------------------------
 	f := feed.NewFeed()
 
-	// -----------------------------
-	// 🔌 WebSocket feeds (market data)
-	// -----------------------------
 	binanceWS := exchange.BinanceWS{}
 	binanceWS.Start(f, []string{
 		"BTCUSDT",
@@ -58,9 +49,6 @@ func main() {
 		"SOL-USDT",
 	})
 
-	// -----------------------------
-	// 🏦 Brokers (trading layer)
-	// -----------------------------
 	bybitBroker := broker.NewBybit(
 		os.Getenv("BYBIT_KEY"),
 		os.Getenv("BYBIT_SECRET"),
@@ -76,10 +64,6 @@ func main() {
 		os.Getenv("KUCOIN_SECRET"),
 		os.Getenv("KUCOIN_PASSPHRASE"),
 	)
-
-	// // =======================
-	// // 🧪 TEST BLOCK (REMOVE LATER)
-	// // =======================
 
 	// log.Println("🧪 Testing Binance Market Buy...")
 
@@ -121,31 +105,21 @@ func main() {
 	// balance, _ := binanceBroker.GetBalance()
 	// log.Println("BALANCE AFTER SELL:", balance)
 
-	// =======================
-	// END TEST BLOCK
-	// =======================
-
-	// -----------------------------
-	// 🧩 Broker map (IMPORTANT)
-	// -----------------------------
 	brokers := map[string]broker.Broker{
 		"bybit":   bybitBroker,
 		"binance": binanceBroker,
 		"kucoin":  kucoinBroker,
 	}
 
-	// -----------------------------
-	// ⚙️ Start Engine
-	// -----------------------------
+	log.Println("BROKERS MAP:", brokers)
+
 	service.StartEngine(ctx, f, brokers)
 
-	// -----------------------------
-	// 🌐 HTTP + WebSocket Server
-	// -----------------------------
 	r := gin.Default()
 
 	r.GET("/ws", handler.HandleWebSocket)
 	r.GET("/balance", handler.GetBalanceHandler(brokers))
+	r.GET("/trades", handler.GetTrades)
 
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -153,21 +127,18 @@ func main() {
 	}
 
 	go func() {
-		log.Println("🚀 Server running on :8080")
+		log.Println("Server running on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %s\n", err)
 		}
 
 	}()
 
-	// -----------------------------
-	// 🛑 Graceful Shutdown
-	// -----------------------------
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	<-quit
-	log.Println("🛑 Shutdown signal received")
+	log.Println("Shutdown signal received")
 
 	cancel() // stop engine
 
@@ -178,8 +149,8 @@ func main() {
 		log.Fatal("Server forced shutdown:", err)
 	}
 
-	log.Println("🔌 Closing WebSocket connections...")
+	log.Println(" Closing WebSocket connections...")
 	websocket.CloseAll()
 
-	log.Println("✅ Server exited gracefully")
+	log.Println("Server exited gracefully")
 }

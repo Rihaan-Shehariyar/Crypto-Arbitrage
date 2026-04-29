@@ -14,19 +14,35 @@ func GetBalanceHandler(brokers map[string]broker.Broker) gin.HandlerFunc {
 
 		result := make(map[string]map[string]float64)
 
+		log.Println("Fetching balances...")
+
 		for name, b := range brokers {
+
+			log.Println(" Checking:", name)
 
 			bal, err := b.GetBalance()
 
+			
 			if err != nil {
-				log.Println("❌ Balance error:", name, err) // 🔥 ADD THIS
+				log.Println(" ERROR:", name, err)
+
+				result[name] = map[string]float64{}
 				continue
 			}
 
-			log.Println("✅ Balance OK:", name, bal) // 🔥 ADD THIS
+			if bal == nil {
+				log.Println(" NIL balance:", name)
+				result[name] = map[string]float64{}
+				continue
+			}
+
+			//  Log actual balance
+			log.Println("BALANCE:", name, bal)
 
 			result[name] = bal
 		}
+
+		log.Println("FINAL RESPONSE:", result)
 
 		c.JSON(http.StatusOK, result)
 	}

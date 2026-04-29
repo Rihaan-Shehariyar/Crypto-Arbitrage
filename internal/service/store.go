@@ -25,3 +25,7 @@ func GetPrices(symbol string) []feed.Price {
 
 	return result
 }
+//
+
+
+

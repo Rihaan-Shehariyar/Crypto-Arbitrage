@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,9 +37,7 @@ func (k *KucoinBroker) Name() string {
 	return "kucoin"
 }
 
-//////////////////////////////////////////////////////
-// 🔐 SIGNING
-//////////////////////////////////////////////////////
+//  SIGNING
 
 func (k *KucoinBroker) sign(ts, method, endpoint, body string) (string, string) {
 
@@ -56,9 +55,8 @@ func (k *KucoinBroker) sign(ts, method, endpoint, body string) (string, string) 
 	return sign, pass
 }
 
-//////////////////////////////////////////////////////
-// 🔧 HTTP HELPER
-//////////////////////////////////////////////////////
+//  HTTP HELPER
+
 
 func (k *KucoinBroker) doRequest(method, endpoint string, body map[string]interface{}) ([]byte, error) {
 
@@ -91,9 +89,8 @@ func (k *KucoinBroker) doRequest(method, endpoint string, body map[string]interf
 	return io.ReadAll(resp.Body)
 }
 
-//////////////////////////////////////////////////////
-// 🟢 MARKET BUY (quote)
-//////////////////////////////////////////////////////
+//  MARKET BUY (quote)
+
 
 func (k *KucoinBroker) MarketBuy(symbol string, quoteQty float64) (string, error) {
 
@@ -122,9 +119,8 @@ func (k *KucoinBroker) MarketBuy(symbol string, quoteQty float64) (string, error
 	return resp.Data.OrderID, nil
 }
 
-//////////////////////////////////////////////////////
-// 🔴 MARKET SELL (base)
-//////////////////////////////////////////////////////
+//  MARKET SELL (base)
+
 
 func (k *KucoinBroker) MarketSell(symbol string, baseQty float64) (string, error) {
 
@@ -153,9 +149,7 @@ func (k *KucoinBroker) MarketSell(symbol string, baseQty float64) (string, error
 	return resp.Data.OrderID, nil
 }
 
-//////////////////////////////////////////////////////
-// 📊 ORDER INFO
-//////////////////////////////////////////////////////
+//  ORDER INFO
 
 func (k *KucoinBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 
@@ -197,9 +191,8 @@ func (k *KucoinBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) 
 	}, nil
 }
 
-//////////////////////////////////////////////////////
-// ❌ CANCEL ORDER
-//////////////////////////////////////////////////////
+//  CANCEL ORDER
+
 
 func (k *KucoinBroker) CancelOrder(symbol, orderId string) error {
 
@@ -208,10 +201,7 @@ func (k *KucoinBroker) CancelOrder(symbol, orderId string) error {
 	return err
 }
 
-//////////////////////////////////////////////////////
-// 💼 BALANCE
-//////////////////////////////////////////////////////
-
+//  BALANCE
 func (k *KucoinBroker) GetBalance() (map[string]float64, error) {
 
 	respBytes, err := k.doRequest("GET", "/api/v1/accounts", nil)
@@ -219,24 +209,39 @@ func (k *KucoinBroker) GetBalance() (map[string]float64, error) {
 		return nil, err
 	}
 
+	log.Println("KUCOIN RAW:", string(respBytes)) 
+
 	var resp struct {
+		Code string `json:"code"`
 		Data []struct {
-			Currency string `json:"currency"`
-			Balance  string `json:"balance"`
-			Type     string `json:"type"`
+			Currency  string `json:"currency"`
+			Available string `json:"available"` 
+			Type      string `json:"type"`
 		} `json:"data"`
 	}
 
-	json.Unmarshal(respBytes, &resp)
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return nil, err
+	}
+
+	if resp.Code != "200000" {
+		return nil, fmt.Errorf("kucoin error: %s", resp.Code)
+	}
 
 	balances := make(map[string]float64)
 
 	for _, b := range resp.Data {
+
+		// only trading account
 		if b.Type != "trade" {
 			continue
 		}
 
-		val, _ := strconv.ParseFloat(b.Balance, 64)
+		val, err := strconv.ParseFloat(b.Available, 64)
+		if err != nil {
+			continue
+		}
+
 		if val > 0 {
 			balances[b.Currency] = val
 		}
@@ -245,9 +250,7 @@ func (k *KucoinBroker) GetBalance() (map[string]float64, error) {
 	return balances, nil
 }
 
-//////////////////////////////////////////////////////
-// 🔧 SYMBOL FORMAT
-//////////////////////////////////////////////////////
+//  SYMBOL FORMAT
 
 func formatKucoinSymbol(symbol string) string {
 	if strings.Contains(symbol, "-") {

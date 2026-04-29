@@ -10,15 +10,15 @@ import (
 
 func HandleWebSocket(c *gin.Context) {
 
-	log.Println("📡 WS request received")
+	log.Println(" WS request received")
 
 	conn, err := websocket.Upgrade(c.Writer, c.Request)
 	if err != nil {
-		log.Println("❌ Upgrade error:", err)
+		log.Println(" Upgrade error:", err)
 		return
 	}
 
-	log.Println("✅ WebSocket connected")
+	log.Println(" WebSocket connected")
 
 	websocket.AddClient(conn)
 	log.Println("Clients:", len(websocket.Clients))

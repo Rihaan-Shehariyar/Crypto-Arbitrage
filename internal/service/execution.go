@@ -63,10 +63,10 @@ func waitForExecution(
 	b broker.Broker,
 	symbol string,
 	orderId string,
-	expectedQty float64, // 🔥 NEW
+	expectedQty float64,
 ) (*broker.OrderInfo, bool) {
 
-	timeout := time.After(3 * time.Second)
+	timeout := time.After(6 * time.Second)
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -75,7 +75,7 @@ func waitForExecution(
 	for {
 		select {
 
-		// ⏰ TIMEOUT
+		//  TIMEOUT
 		case <-timeout:
 			log.Println("⏰ Timeout → cancelling order:", orderId)
 
@@ -83,31 +83,31 @@ func waitForExecution(
 				log.Println("⚠️ Cancel error:", err)
 			}
 
-			// ✅ Accept ONLY meaningful partial fills
+			// Accept ONLY meaningful partial fills
 			if lastInfo != nil && lastInfo.FilledQty > 0 {
 
 				fillRatio := lastInfo.FilledQty / expectedQty
 
 				if fillRatio < 0.9 {
-					log.Println("❌ BUY partial too small → skip")
+					log.Println("BUY partial too small → skip")
 					continue
 				}
 
-				log.Printf("⚠️ Partial fill ratio: %.2f%%",
+				log.Printf("Partial fill ratio: %.2f%%",
 					fillRatio*100,
 				)
 
-				// 🔥 Accept only if >80% filled
+				//  Accept only if >80% filled
 				if fillRatio >= 0.8 {
 					return lastInfo, true
 				}
 
-				log.Println("❌ Partial fill too small → discard")
+				log.Println("Partial fill too small → discard")
 			}
 
 			return nil, false
 
-		// 🔄 POLLING
+		// POLLING
 		case <-ticker.C:
 			info, err := b.GetOrderInfo(symbol, orderId)
 			if err != nil || info == nil {
@@ -118,26 +118,26 @@ func waitForExecution(
 
 			status := strings.ToLower(info.Status)
 
-			// ✅ FULL FILLED
+			// FULL FILLED
 			if status == "filled" {
 				return info, true
 			}
 
-			// ⚠️ PARTIAL
+			// PARTIAL
 			if info.FilledQty > 0 {
-				log.Printf("⚠️ Partial fill [%s]: %.6f / %.6f",
+				log.Printf("Partial fill [%s]: %.6f / %.6f",
 					b.Name(),
 					info.FilledQty,
 					expectedQty,
 				)
 			}
 
-			// ❌ FAILURE STATES
+			// FAILURE STATES
 			if status == "cancelled" ||
 				status == "canceled" ||
 				status == "rejected" {
 
-				log.Println("❌ Order failed:", status)
+				log.Println("Order failed:", status)
 				return info, false
 			}
 		}

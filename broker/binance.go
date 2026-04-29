@@ -33,9 +33,8 @@ func (b *BinanceBroker) Name() string {
 	return "binance"
 }
 
-//////////////////////////////////////////////////////
-// 🔐 SIGNING
-//////////////////////////////////////////////////////
+//  SIGNING
+
 
 func (b *BinanceBroker) sign(query string) string {
 	h := hmac.New(sha256.New, []byte(b.Secret))
@@ -43,9 +42,8 @@ func (b *BinanceBroker) sign(query string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-//////////////////////////////////////////////////////
-// 🔧 HTTP REQUEST
-//////////////////////////////////////////////////////
+//  HTTP REQUEST
+
 
 func (b *BinanceBroker) doRequest(method, endpoint, params string) ([]byte, error) {
 
@@ -72,7 +70,7 @@ func (b *BinanceBroker) doRequest(method, endpoint, params string) ([]byte, erro
 
 	body, _ := io.ReadAll(resp.Body)
 
-	// 🔥 DEBUG (IMPORTANT)
+
 	// fmt.Println("BINANCE RAW:", string(body))
 
 	if resp.StatusCode != 200 {
@@ -82,9 +80,7 @@ func (b *BinanceBroker) doRequest(method, endpoint, params string) ([]byte, erro
 	return body, nil
 }
 
-//////////////////////////////////////////////////////
-// 🟢 MARKET BUY (USDT)
-//////////////////////////////////////////////////////
+//  MARKET BUY 
 
 func (b *BinanceBroker) MarketBuy(symbol string, quoteQty float64) (string, error) {
 
@@ -124,9 +120,8 @@ func (b *BinanceBroker) MarketBuy(symbol string, quoteQty float64) (string, erro
 	return strconv.FormatInt(resp.OrderID, 10), nil
 }
 
-//////////////////////////////////////////////////////
-// 🔴 MARKET SELL
-//////////////////////////////////////////////////////
+//  MARKET SELL
+
 
 func (b *BinanceBroker) MarketSell(symbol string, qty float64) (string, error) {
 
@@ -165,9 +160,8 @@ func (b *BinanceBroker) MarketSell(symbol string, qty float64) (string, error) {
 	return strconv.FormatInt(resp.OrderID, 10), nil
 }
 
-//////////////////////////////////////////////////////
-// 📊 ORDER INFO
-//////////////////////////////////////////////////////
+//  ORDER INFO
+
 
 func (b *BinanceBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 
@@ -208,9 +202,8 @@ func (b *BinanceBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error)
 	}, nil
 }
 
-//////////////////////////////////////////////////////
-// ❌ CANCEL ORDER
-//////////////////////////////////////////////////////
+//  CANCEL ORDER
+
 
 func (b *BinanceBroker) CancelOrder(symbol, orderId string) error {
 
@@ -224,10 +217,7 @@ func (b *BinanceBroker) CancelOrder(symbol, orderId string) error {
 	return err
 }
 
-//////////////////////////////////////////////////////
-// 💼 BALANCE
-//////////////////////////////////////////////////////
-
+//  BALANCE
 func (b *BinanceBroker) GetBalance() (map[string]float64, error) {
 
 	body, err := b.doRequest("GET", "/api/v3/account", "")
