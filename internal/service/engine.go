@@ -23,8 +23,6 @@ type Opportunity struct {
 var lastTradeTime = make(map[string]int64)
 var openPositions = make(map[string]bool)
 
-// const DRY_RUN = true
-
 func StartEngine(
 	ctx context.Context,
 	f *feed.Feed,
@@ -32,18 +30,20 @@ func StartEngine(
 ) {
 	go func() {
 
-		log.Println("[ENGINE] started (SAFE MODE)")
+		log.Println("🚀 Engine started")
 
 		fee := 0.001
 		slippage := 0.001
-		tradeSize := 100.0
-		// minProfit := 0.2 // %
+		tradeSize := 10.0
+
+		//  DEMO MODE SWITCH
+		demoMode := true
 
 		for {
 			select {
 
 			case <-ctx.Done():
-				log.Println("[ENGINE] shutting down...")
+				log.Println("🛑 Engine stopped")
 				return
 
 			case price := <-f.Stream:
@@ -57,7 +57,6 @@ func StartEngine(
 
 				now := time.Now().UnixMilli()
 
-				// prevent overlapping trades
 				if openPositions[price.Symbol] {
 					continue
 				}
@@ -65,7 +64,7 @@ func StartEngine(
 				var bestBuy, bestSell feed.Price
 				bestPercent := -999.0
 
-				// 1. FIND BEST OPPORTUNITY
+				// 🔍 FIND BEST OPPORTUNITY
 				for _, buy := range prices {
 					for _, sell := range prices {
 
@@ -91,88 +90,77 @@ func StartEngine(
 					}
 				}
 
-				// 2. VALIDATION
+				// 📊 ALWAYS SHOW SPREAD
+				// log.Printf("📊 %s | Spread: %.3f%%", price.Symbol, bestPercent)
 
-				// if bestPercent < minProfit {
-				// 	continue
-				// }
-
-				if bestPercent < 0.0 {
+				// ❌ FILTER
+				if bestPercent < -100 {
 					continue
 				}
 
 				key := price.Symbol
-
 				if now-lastTradeTime[key] < 5000 {
 					continue
 				}
 				lastTradeTime[key] = now
 
-				buyBroker := brokers[bestBuy.Exchange]
-				sellBroker := brokers[bestSell.Exchange]
+				var buyBroker, sellBroker broker.Broker
+
+				// 🎯 DEMO MODE (force same exchange)
+				if demoMode {
+					buyBroker = brokers["binance"]
+					sellBroker = brokers["binance"]
+
+					bestBuy.Exchange = "binance"
+					bestSell.Exchange = "binance"
+
+					log.Println("DEMO MODE: Same-exchange execution")
+				} else {
+					buyBroker = brokers[bestBuy.Exchange]
+					sellBroker = brokers[bestSell.Exchange]
+				}
 
 				if buyBroker == nil || sellBroker == nil {
 					continue
 				}
 
-				log.Printf(
-					"ARB %s | BUY %s → SELL %s | %.3f%%",
+				// ✅ CLEAN LOG (consistent)
+				log.Printf("🚀 ARB %s | BUY %s → SELL %s | %.3f%%",
 					price.Symbol,
 					bestBuy.Exchange,
 					bestSell.Exchange,
 					bestPercent,
 				)
 
+				// 📡 BROADCAST
 				websocket.Broadcast(Opportunity{
 					Coin:      price.Symbol,
 					BuyFrom:   bestBuy.Exchange,
 					SellTo:    bestSell.Exchange,
 					BuyPrice:  bestBuy.Ask,
 					SellPrice: bestSell.Bid,
-					Profit:    0, // not executed yet
+					Profit:    0,
 					Percent:   bestPercent,
 				})
 
-				// 3. BALANCE CHECK
-				// buyBal, err := buyBroker.GetBalance()
-				// if err != nil {
-				// 	continue
-				// }
-
-				// sellBal, err := sellBroker.GetBalance()
-				// if err != nil {
-				// 	continue
-				// }
-
-				// // if DRY_RUN {
-				// // 	log.Println("DRY RUN → skipping execution")
-				// // 	continue
-				// // }
-
-				// baseAsset := strings.TrimSuffix(price.Symbol, "USDT")
-
-				// if buyBal["USDT"] < tradeSize {
-				// 	log.Println("Not enough USDT on BUY exchange")
-				// 	continue
-				// }
-
-				// estimatedQty := tradeSize / bestBuy.Ask
-
-				// if sellBal[baseAsset] < estimatedQty {
-				// 	log.Println("Not enough asset on SELL exchange")
-				// 	continue
-				// }
-
-				// lock position
 				openPositions[price.Symbol] = true
 
-				// 4. EXECUTION
-				log.Println("Executing arbitrage...")
+				log.Println("⚡ Executing arbitrage...")
 
 				// BUY
 				buyOrderId, err := buyBroker.MarketBuy(price.Symbol, tradeSize)
 				if err != nil {
-					log.Println("BUY error:", err)
+
+					log.Println("❌ BUY error:", err)
+
+					AddTrade(Trade{
+						ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
+						Coin:   price.Symbol,
+						Status: "BUY_FAILED",
+						Error:  err.Error(),
+						Time:   time.Now(),
+					})
+
 					openPositions[price.Symbol] = false
 					continue
 				}
@@ -188,7 +176,7 @@ func StartEngine(
 
 				if !ok || buyInfo.FilledQty == 0 {
 
-					log.Println("BUY failed")
+					log.Println("❌ BUY failed")
 
 					AddTrade(Trade{
 						ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -202,17 +190,10 @@ func StartEngine(
 					continue
 				}
 
-				log.Printf("BUY filled qty=%.6f price=%.2f",
+				log.Printf("🟢 BUY filled | qty=%.6f price=%.2f",
 					buyInfo.FilledQty,
 					buyInfo.AvgPrice,
 				)
-
-				// NOTIONAL CHECK
-				if buyInfo.FilledQty*bestBuy.Bid < 10 {
-					log.Println("Too small → skipping SELL")
-					openPositions[price.Symbol] = false
-					continue
-				}
 
 				// SELL
 				sellOrderId, err := sellBroker.MarketSell(
@@ -220,7 +201,9 @@ func StartEngine(
 					buyInfo.FilledQty,
 				)
 				if err != nil {
-					log.Println("SELL error:", err)
+
+					log.Println("❌ SELL error:", err)
+
 					openPositions[price.Symbol] = false
 					continue
 				}
@@ -232,10 +215,9 @@ func StartEngine(
 					buyInfo.FilledQty,
 				)
 
-				// 5. FAIL-SAFE SELL
 				if !ok || sellInfo.FilledQty == 0 {
 
-					log.Println("SELL failed → retrying...")
+					log.Println("❌ SELL failed")
 
 					AddTrade(Trade{
 						ID:      fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -244,58 +226,25 @@ func StartEngine(
 						BuyFrom: bestBuy.Exchange,
 						SellTo:  bestSell.Exchange,
 						Qty:     buyInfo.FilledQty,
-						Error:   "sell failed after retry",
+						Error:   "sell failed",
 						Time:    time.Now(),
 					})
 
-					sellOrderId, err = sellBroker.MarketSell(
-						price.Symbol,
-						buyInfo.FilledQty,
-					)
-					if err != nil {
-						log.Println("SELL retry failed")
-
-						log.Println("Emergency exit on BUY exchange")
-						_, _ = buyBroker.MarketSell(
-							price.Symbol,
-							buyInfo.FilledQty,
-						)
-
-						openPositions[price.Symbol] = false
-						continue
-					}
-
-					sellInfo, ok = waitForExecution(
-						sellBroker,
-						price.Symbol,
-						sellOrderId,
-						buyInfo.FilledQty,
-					)
-
-					if !ok || sellInfo.FilledQty == 0 {
-						log.Println("SELL retry failed → force exit")
-						_, _ = buyBroker.MarketSell(
-							price.Symbol,
-							buyInfo.FilledQty,
-						)
-
-						openPositions[price.Symbol] = false
-						continue
-					}
+					openPositions[price.Symbol] = false
+					continue
 				}
 
-				log.Printf("SELL filled qty=%.6f price=%.2f",
+				log.Printf("🔴 SELL filled | qty=%.6f price=%.2f",
 					sellInfo.FilledQty,
 					sellInfo.AvgPrice,
 				)
 
-				// 6. REAL PROFIT
+				// 💰 PROFIT
 				profit := (sellInfo.AvgPrice*(1-fee) -
 					buyInfo.AvgPrice*(1+fee)) * sellInfo.FilledQty
 
-				log.Printf("REAL PROFIT: %.4f USDT", profit)
+				log.Printf("💰 PROFIT: %.4f USDT", profit)
 
-				// unlock position
 				openPositions[price.Symbol] = false
 
 				trade := Trade{
@@ -312,12 +261,18 @@ func StartEngine(
 				}
 
 				AddTrade(trade)
-				// 7. BROADCAST
+
 				websocket.Broadcast(map[string]interface{}{
 					"type":  "trade",
 					"data":  trade,
 					"total": GetTotalPnL(),
 				})
+
+				// ✅ STOP AFTER ONE TRADE (for demo)
+				if demoMode {
+					log.Println("✅ DEMO COMPLETE")
+					return
+				}
 			}
 		}
 	}()

@@ -59,11 +59,11 @@ func main() {
 		os.Getenv("BINANCE_SECRET"),
 	)
 
-	kucoinBroker := broker.NewKucoin(
-		os.Getenv("KUCOIN_KEY"),
-		os.Getenv("KUCOIN_SECRET"),
-		os.Getenv("KUCOIN_PASSPHRASE"),
-	)
+	// kucoinBroker := broker.NewKucoin(
+	// 	os.Getenv("KUCOIN_KEY"),
+	// 	os.Getenv("KUCOIN_SECRET"),
+	// 	os.Getenv("KUCOIN_PASSPHRASE"),
+	// )
 
 	// log.Println("🧪 Testing Binance Market Buy...")
 
@@ -108,7 +108,7 @@ func main() {
 	brokers := map[string]broker.Broker{
 		"bybit":   bybitBroker,
 		"binance": binanceBroker,
-		"kucoin":  kucoinBroker,
+		// "kucoin":  kucoinBroker,
 	}
 
 	log.Println("BROKERS MAP:", brokers)
