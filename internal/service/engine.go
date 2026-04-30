@@ -37,13 +37,13 @@ func StartEngine(
 		tradeSize := 10.0
 
 		//  DEMO MODE SWITCH
-		demoMode := true
+		demoMode := false
 
 		for {
 			select {
 
 			case <-ctx.Done():
-				log.Println("🛑 Engine stopped")
+				log.Println("Engine stopped")
 				return
 
 			case price := <-f.Stream:
@@ -64,7 +64,7 @@ func StartEngine(
 				var bestBuy, bestSell feed.Price
 				bestPercent := -999.0
 
-				// 🔍 FIND BEST OPPORTUNITY
+				// FIND BEST OPPORTUNITY
 				for _, buy := range prices {
 					for _, sell := range prices {
 
@@ -90,10 +90,10 @@ func StartEngine(
 					}
 				}
 
-				// 📊 ALWAYS SHOW SPREAD
-				// log.Printf("📊 %s | Spread: %.3f%%", price.Symbol, bestPercent)
+				// ALWAYS SHOW SPREAD
+				// log.Printf(" %s | Spread: %.3f%%", price.Symbol, bestPercent)
 
-				// ❌ FILTER
+				//  FILTER
 				if bestPercent < -100 {
 					continue
 				}
@@ -106,7 +106,7 @@ func StartEngine(
 
 				var buyBroker, sellBroker broker.Broker
 
-				// 🎯 DEMO MODE (force same exchange)
+				// DEMO MODE (force same exchange)
 				if demoMode {
 					buyBroker = brokers["binance"]
 					sellBroker = brokers["binance"]
@@ -124,15 +124,15 @@ func StartEngine(
 					continue
 				}
 
-				// ✅ CLEAN LOG (consistent)
-				log.Printf("🚀 ARB %s | BUY %s → SELL %s | %.3f%%",
+				// CLEAN LOG 
+				log.Printf("ARB %s | BUY %s → SELL %s | %.3f%%",
 					price.Symbol,
 					bestBuy.Exchange,
 					bestSell.Exchange,
 					bestPercent,
 				)
 
-				// 📡 BROADCAST
+				//  BROADCAST
 				websocket.Broadcast(Opportunity{
 					Coin:      price.Symbol,
 					BuyFrom:   bestBuy.Exchange,
@@ -151,7 +151,7 @@ func StartEngine(
 				buyOrderId, err := buyBroker.MarketBuy(price.Symbol, tradeSize)
 				if err != nil {
 
-					log.Println("❌ BUY error:", err)
+					log.Println("BUY error:", err)
 
 					AddTrade(Trade{
 						ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -176,7 +176,7 @@ func StartEngine(
 
 				if !ok || buyInfo.FilledQty == 0 {
 
-					log.Println("❌ BUY failed")
+					log.Println(" BUY failed")
 
 					AddTrade(Trade{
 						ID:     fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -190,7 +190,7 @@ func StartEngine(
 					continue
 				}
 
-				log.Printf("🟢 BUY filled | qty=%.6f price=%.2f",
+				log.Printf("BUY filled | qty=%.6f price=%.2f",
 					buyInfo.FilledQty,
 					buyInfo.AvgPrice,
 				)
@@ -202,7 +202,7 @@ func StartEngine(
 				)
 				if err != nil {
 
-					log.Println("❌ SELL error:", err)
+					log.Println("SELL error:", err)
 
 					openPositions[price.Symbol] = false
 					continue
@@ -217,7 +217,7 @@ func StartEngine(
 
 				if !ok || sellInfo.FilledQty == 0 {
 
-					log.Println("❌ SELL failed")
+					log.Println("SELL failed")
 
 					AddTrade(Trade{
 						ID:      fmt.Sprintf("%d", time.Now().UnixNano()),
@@ -234,16 +234,16 @@ func StartEngine(
 					continue
 				}
 
-				log.Printf("🔴 SELL filled | qty=%.6f price=%.2f",
+				log.Printf("SELL filled | qty=%.6f price=%.2f",
 					sellInfo.FilledQty,
 					sellInfo.AvgPrice,
 				)
 
-				// 💰 PROFIT
+				// PROFIT
 				profit := (sellInfo.AvgPrice*(1-fee) -
 					buyInfo.AvgPrice*(1+fee)) * sellInfo.FilledQty
 
-				log.Printf("💰 PROFIT: %.4f USDT", profit)
+				log.Printf("PROFIT: %.4f USDT", profit)
 
 				openPositions[price.Symbol] = false
 
@@ -268,9 +268,9 @@ func StartEngine(
 					"total": GetTotalPnL(),
 				})
 
-				// ✅ STOP AFTER ONE TRADE (for demo)
+				// demo
 				if demoMode {
-					log.Println("✅ DEMO COMPLETE")
+					log.Println("DEMO COMPLETE")
 					return
 				}
 			}

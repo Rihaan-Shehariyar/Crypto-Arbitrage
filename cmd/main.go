@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -116,6 +117,7 @@ func main() {
 	service.StartEngine(ctx, f, brokers)
 
 	r := gin.Default()
+	r.Use(cors.Default())
 
 	r.GET("/ws", handler.HandleWebSocket)
 	r.GET("/balance", handler.GetBalanceHandler(brokers))

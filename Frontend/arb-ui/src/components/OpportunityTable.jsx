@@ -2,7 +2,7 @@ export default function OpportunityTable({ data }) {
   return (
     <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
       <h2 className="text-xl font-semibold mb-4">
-         Arbitrage Opportunities
+        Arbitrage Opportunities
       </h2>
 
       {data.length === 0 && (
@@ -16,8 +16,8 @@ export default function OpportunityTable({ data }) {
           <thead className="text-gray-400 border-b border-gray-700">
             <tr>
               <th className="py-2">Coin</th>
-              <th>Buy</th>
-              <th>Sell</th>
+              <th>Buy (Price)</th>
+              <th>Sell (Price)</th>
               <th>%</th>
               <th>Profit</th>
             </tr>
@@ -35,6 +35,7 @@ export default function OpportunityTable({ data }) {
                     isHot ? "bg-green-900/30" : ""
                   }`}
                 >
+                  {/* Coin */}
                   <td className="py-2 font-medium">
                     {o.coin}
                     {isHot && (
@@ -44,19 +45,38 @@ export default function OpportunityTable({ data }) {
                     )}
                   </td>
 
-                  <td>{o.buy_from}</td>
-                  <td>{o.sell_to}</td>
+                  {/* Buy */}
+                  <td>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{o.buy_from}</span>
+                      <span className="text-xs text-green-400">
+                        {o.buy_price?.toFixed(2) ?? "-"}
+                      </span>
+                    </div>
+                  </td>
 
+                  {/* Sell */}
+                  <td>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{o.sell_to}</span>
+                      <span className="text-xs text-red-400">
+                        {o.sell_price?.toFixed(2) ?? "-"}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* Percent */}
                   <td
                     className={`font-semibold ${
                       isProfit ? "text-green-400" : "text-red-400"
                     }`}
                   >
-                    {o.percent.toFixed(3)}%
+                    {o.percent?.toFixed(3)}%
                   </td>
 
+                  {/* Profit */}
                   <td className="text-gray-300">
-                    {o.profit.toFixed(4)}
+                    {o.profit?.toFixed(4) ?? "0.0000"}
                   </td>
                 </tr>
               );

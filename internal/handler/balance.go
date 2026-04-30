@@ -37,12 +37,12 @@ func GetBalanceHandler(brokers map[string]broker.Broker) gin.HandlerFunc {
 			}
 
 			//  Log actual balance
-			log.Println("BALANCE:", name, bal)
+			// log.Println("BALANCE:", name, bal)
 
 			result[name] = bal
 		}
 
-		log.Println("FINAL RESPONSE:", result)
+		// log.Println("FINAL RESPONSE:", result)
 
 		c.JSON(http.StatusOK, result)
 	}

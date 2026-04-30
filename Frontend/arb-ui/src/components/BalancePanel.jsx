@@ -2,13 +2,19 @@ export default function BalancePanel({ balance }) {
   return (
     <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
       <h2 className="text-xl font-semibold mb-4">
-        💰 Exchange Balances
+        Exchange Balances
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(balance).map(([exchange, assets]) => {
+      {/* handle loading / empty */}
+      {!balance && (
+        <p className="text-gray-500 text-center py-4">
+          Loading balances...
+        </p>
+      )}
 
-          // 🔥 filter only useful balances
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {Object.entries(balance || {}).map(([exchange, assets]) => {
+
           const filtered = Object.entries(assets || {})
             .filter(([_, value]) => value > 0);
 
@@ -25,7 +31,10 @@ export default function BalancePanel({ balance }) {
 
               {filtered.slice(0, 10).map(([asset, value]) => (
                 <div key={asset} className="text-sm text-gray-300">
-                  {asset}: {value.toFixed(4)}
+                  {asset}:{" "}
+                  {typeof value === "number"
+                    ? value.toFixed(4)
+                    : value}
                 </div>
               ))}
             </div>

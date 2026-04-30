@@ -227,7 +227,7 @@ func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
-	log.Println("BYBIT BALANCE RAW:", string(body))
+	// log.Println("BYBIT BALANCE RAW:", string(body))
 
 	var result struct {
 		RetCode int    `json:"retCode"`
