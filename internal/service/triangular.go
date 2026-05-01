@@ -17,9 +17,9 @@ func handleTriangular(b broker.Broker) {
 		p3 := feed.GetBestPrice(t.Alt + t.Quote)
 
 		if p1 == nil || p2 == nil || p3 == nil {
+			log.Printf("[TRI SKIP] Missing data: %s-%s", t.Base, t.Alt)
 			continue
 		}
-
 		baseQty := usdt / p1.Ask
 		altQty := baseQty / p2.Ask
 		final := altQty * p3.Bid
@@ -27,9 +27,12 @@ func handleTriangular(b broker.Broker) {
 		profit := final - usdt
 		percent := (profit / usdt) * 100
 
-		if percent <= 0 {
+		if percent <= -1 {
 			continue
 		}
+
+		log.Printf("[TRI CALC] %s-%s profit=%.4f%%",
+			t.Base, t.Alt, percent)
 
 		log.Printf("🔺 TRI %s-%s profit=%.4f (%.3f%%)",
 			t.Base, t.Alt, profit, percent,

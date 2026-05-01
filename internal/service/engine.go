@@ -30,6 +30,7 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 
 			case p := <-f.Stream:
 				feed.UpdatePrice(p)
+				log.Println("Tick:", p.Exchange, p.Symbol, p.Ask, p.Bid)
 
 				switch CurrentMode {
 
@@ -40,6 +41,7 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 					handleTriangular(brokers["binance"])
 				}
 			}
+
 		}
 	}()
 }

@@ -26,6 +26,7 @@ func handleCross(symbol string, brokers map[string]broker.Broker) {
 
 	for _, buy := range prices {
 		for _, sell := range prices {
+			log.Println("[CROSS CHECK]", symbol)
 
 			if buy.Exchange == sell.Exchange {
 				continue
