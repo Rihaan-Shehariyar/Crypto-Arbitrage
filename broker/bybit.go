@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,7 +35,7 @@ func (b *BybitBroker) Name() string {
 	return "bybit"
 }
 
-//  SIGNING
+// SIGNING
 func (b *BybitBroker) sign(payload string, ts string) string {
 	message := ts + b.ApiKey + "5000" + payload
 
@@ -45,7 +46,6 @@ func (b *BybitBroker) sign(payload string, ts string) string {
 }
 
 // 🔧 HTTP HELPER
-
 
 func (b *BybitBroker) doPOST(endpoint string, body map[string]interface{}) ([]byte, error) {
 
@@ -76,12 +76,12 @@ func (b *BybitBroker) doPOST(endpoint string, body map[string]interface{}) ([]by
 
 func (b *BybitBroker) MarketBuy(symbol string, quoteQty float64) (string, error) {
 
+	qty := math.Floor(quoteQty*1000) / 1000
 	body := map[string]interface{}{
 		"category":    "spot",
 		"symbol":      symbol,
 		"side":        "Buy",
-		"type":        "Market",
-		"qty":         fmt.Sprintf("%.6f", quoteQty),
+		"qty":         fmt.Sprintf("%.6f", qty),
 		"orderType":   "Market",
 		"timeInForce": "IOC",
 		"marketUnit":  "quoteCoin",
@@ -93,29 +93,36 @@ func (b *BybitBroker) MarketBuy(symbol string, quoteQty float64) (string, error)
 	}
 
 	var resp struct {
-		Result struct {
+		RetCode int    `json:"retCode"`
+		RetMsg  string `json:"retMsg"`
+		Result  struct {
 			OrderID string `json:"orderId"`
 		} `json:"result"`
 	}
-
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return "", err
 	}
+
+	if resp.RetCode != 0 {
+		return "", fmt.Errorf("bybit error : %s", resp.RetMsg)
+	}
+
+	log.Println("BYBIT RESPONSE:", string(respBytes))
 
 	return resp.Result.OrderID, nil
 }
 
 //  MARKET SELL
 
-
 func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error) {
+
+	qty := math.Floor(baseQty*1000) / 1000
 
 	body := map[string]interface{}{
 		"category":    "spot",
 		"symbol":      symbol,
 		"side":        "Sell",
-		"type":        "Market",
-		"qty":         fmt.Sprintf("%.6f", baseQty),
+		"qty":         fmt.Sprintf("%.6f", qty),
 		"timeInForce": "IOC",
 	}
 
@@ -125,7 +132,9 @@ func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error)
 	}
 
 	var resp struct {
-		Result struct {
+		RetCode int    `json:"retCode"`
+		RetMsg  string `json:"retMsg"`
+		Result  struct {
 			OrderID string `json:"orderId"`
 		} `json:"result"`
 	}
@@ -133,12 +142,15 @@ func (b *BybitBroker) MarketSell(symbol string, baseQty float64) (string, error)
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return "", err
 	}
+	if resp.RetCode != 0 {
+		return "", fmt.Errorf("bybit error : %s", resp.RetMsg)
+	}
+	log.Println("BYBIT RESPONSE:", string(respBytes))
 
 	return resp.Result.OrderID, nil
 }
 
 //  ORDER INFO
-
 
 func (b *BybitBroker) GetOrderInfo(symbol, orderId string) (*OrderInfo, error) {
 
@@ -206,7 +218,6 @@ func (b *BybitBroker) CancelOrder(symbol, orderId string) error {
 }
 
 //  BALANCE
-
 
 func (b *BybitBroker) GetBalance() (map[string]float64, error) {
 

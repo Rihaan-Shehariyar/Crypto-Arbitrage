@@ -27,6 +27,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// -------------------------
+	// 🔧 CONFIG
+	// -------------------------
+
+	service.CurrentMode = service.Cross
+	service.Simulate = true
+
+	log.Println("Mode:", service.CurrentMode)
+	log.Println("Simulation:", service.Simulate)
+
+	// -------------------------
+	// 📡 FEED
+	// -------------------------
+
 	f := feed.NewFeed()
 
 	binanceWS := exchange.BinanceWS{}
@@ -34,6 +48,8 @@ func main() {
 		"BTCUSDT",
 		"ETHUSDT",
 		"SOLUSDT",
+		"ETHBTC",
+		"SOLBTC",
 	})
 
 	bybitWS := exchange.BybitWS{}
@@ -50,71 +66,49 @@ func main() {
 		"SOL-USDT",
 	})
 
-	bybitBroker := broker.NewBybit(
-		os.Getenv("BYBIT_KEY"),
-		os.Getenv("BYBIT_SECRET"),
-	)
+	// -------------------------
+	// 💰 BROKER
+	// -------------------------
 
 	binanceBroker := broker.NewBinance(
 		os.Getenv("BINANCE_KEY"),
 		os.Getenv("BINANCE_SECRET"),
 	)
 
-	// kucoinBroker := broker.NewKucoin(
-	// 	os.Getenv("KUCOIN_KEY"),
-	// 	os.Getenv("KUCOIN_SECRET"),
-	// 	os.Getenv("KUCOIN_PASSPHRASE"),
-	// )
-
-	// log.Println("🧪 Testing Binance Market Buy...")
-
-	// buyOrderId, err := binanceBroker.MarketBuy("BTCUSDT", 10)
-	// if err != nil {
-	// 	log.Println("BUY error:", err)
-	// } else {
-	// 	log.Println("BUY order placed:", buyOrderId)
-	// }
-
-	// // ⏳ small delay to ensure fill
-	// time.Sleep(500 * time.Millisecond)
-
-	// // 🔍 fetch filled info
-	// buyInfo, err := binanceBroker.GetOrderInfo("BTCUSDT", buyOrderId)
-	// if err != nil {
-	// 	log.Println("BUY info error:", err)
-	// } else {
-	// 	log.Printf("BUY FILLED: qty=%.6f avgPrice=%.2f",
-	// 		buyInfo.FilledQty,
-	// 		buyInfo.AvgPrice,
-	// 	)
-	// }
-
-	// // =======================
-	// // 🔴 SELL TEST
-	// // =======================
-
-	// log.Println("🧪 Testing SELL...")
-
-	// sellOrderId, err := binanceBroker.MarketSell("BTCUSDT", buyInfo.FilledQty)
-	// if err != nil {
-	// 	log.Println("SELL error:", err)
-	// } else {
-	// 	log.Println("SELL order placed:", sellOrderId)
-	// }
-
-	// // check final balance
-	// balance, _ := binanceBroker.GetBalance()
-	// log.Println("BALANCE AFTER SELL:", balance)
-
 	brokers := map[string]broker.Broker{
-		"bybit":   bybitBroker,
 		"binance": binanceBroker,
-		// "kucoin":  kucoinBroker,
 	}
 
-	log.Println("BROKERS MAP:", brokers)
+	log.Println("Brokers initialized")
+
+	// -------------------------
+	// 🔺 TRIANGLES
+	// -------------------------
+
+	symbols, err := service.FetchBinanceSymbols()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	service.InitTriangles(symbols)
+	log.Println("Triangles initialized")
+
+	// -------------------------
+	// ⏳ WAIT FOR DATA
+	// -------------------------
+
+	log.Println("Waiting for market data...")
+	time.Sleep(2 * time.Second)
+
+	// -------------------------
+	// 🚀 ENGINE
+	// -------------------------
 
 	service.StartEngine(ctx, f, brokers)
+
+	// -------------------------
+	// 🌐 API
+	// -------------------------
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -131,10 +125,13 @@ func main() {
 	go func() {
 		log.Println("Server running on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %s\n", err)
+			log.Fatal(err)
 		}
-
 	}()
+
+	// -------------------------
+	// 🛑 SHUTDOWN
+	// -------------------------
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -142,17 +139,13 @@ func main() {
 	<-quit
 	log.Println("Shutdown signal received")
 
-	cancel() // stop engine
+	cancel()
 
 	ctxTimeout, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelTimeout()
 
-	if err := srv.Shutdown(ctxTimeout); err != nil {
-		log.Fatal("Server forced shutdown:", err)
-	}
+	srv.Shutdown(ctxTimeout)
 
-	log.Println(" Closing WebSocket connections...")
 	websocket.CloseAll()
-
-	log.Println("Server exited gracefully")
+	log.Println("Server exited")
 }
