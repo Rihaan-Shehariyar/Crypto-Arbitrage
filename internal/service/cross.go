@@ -1,73 +1,86 @@
 package service
 
 import (
-	"crypto-arbitrage/broker"
 	"crypto-arbitrage/internal/feed"
 	"log"
 )
 
-const tradeCapital = 10.0
+const (
+	tradeCapital = 100.0
+	feeRate      = 0.001 // 0.1% per trade
+	minSpread    = 0.2   // % threshold
+)
 
-func handleCross(symbol string, brokers map[string]broker.Broker) {
-
-	prices := feed.GetPrices(symbol)
-	if len(prices) < 2 {
-		return
-	}
+func handleCross(symbol string) {
 
 	orderBooks := feed.GetOrderBooks(symbol)
+
 	if orderBooks == nil {
 		return
 	}
 
-	bestPercent := -999.0
-	var bestBuy, bestSell feed.Price
-	var bestQty float64
-
-	for _, buy := range prices {
-		for _, sell := range prices {
-			log.Println("[CROSS CHECK]", symbol)
-
-			if buy.Exchange == sell.Exchange {
-				continue
-			}
-
-			buyOB, ok1 := orderBooks[buy.Exchange]
-			sellOB, ok2 := orderBooks[sell.Exchange]
-
-			if !ok1 || !ok2 {
-				continue
-			}
-
-			avgBuy, qty := simulateBuy(buyOB.Asks, tradeCapital)
-			if avgBuy == 0 || qty == 0 {
-				continue
-			}
-
-			avgSell := simulateSell(sellOB.Bids, qty)
-			if avgSell == 0 {
-				continue
-			}
-
-			profit := (avgSell * qty) - tradeCapital
-			percent := (profit / tradeCapital) * 100
-
-			if percent > bestPercent {
-				bestPercent = percent
-				bestBuy = buy
-				bestSell = sell
-				bestQty = qty
-			}
-		}
-	}
-
-	if bestPercent <= 0 {
+	// Need at least 2 exchanges
+	if len(orderBooks) < 2 {
 		return
 	}
 
-	log.Printf("🔥 ARB %s | BUY %s → SELL %s | %.3f%%",
-		symbol, bestBuy.Exchange, bestSell.Exchange, bestPercent,
-	)
+	for buyEx, buyOB := range orderBooks {
 
-	go executeTrade(symbol, bestBuy, bestSell, bestQty, brokers)
+		for sellEx, sellOB := range orderBooks {
+
+			if buyEx == sellEx {
+				continue
+			}
+
+			// 🔥 Ignore exchanges without execution support
+			if buyEx == "kucoin" || sellEx == "kucoin" {
+				continue
+			}
+
+			if len(buyOB.Asks) == 0 || len(sellOB.Bids) == 0 {
+				continue
+			}
+
+			// Best prices
+			buyPrice := buyOB.Asks[0].Price
+			sellPrice := sellOB.Bids[0].Price
+
+			if buyPrice <= 0 || sellPrice <= 0 {
+				continue
+			}
+
+			// Quantity based on capital
+			qty := tradeCapital / buyPrice
+
+			// Apply fees
+			cost := qty * buyPrice * (1 + feeRate)
+			revenue := qty * sellPrice * (1 - feeRate)
+
+			profit := revenue - cost
+
+			percent := (profit / cost) * 100
+
+			// 🔍 Debug log (keep for now)
+			log.Printf("[CROSS CHECK] %s | %s → %s | %.5f%%",
+				symbol, buyEx, sellEx, percent,
+			)
+
+			// 🔥 Real filter
+			if percent < minSpread {
+				continue
+			}
+
+			// 🔥 VALID ARBITRAGE
+			log.Printf(
+				"🔥 ARB %s | BUY %s → SELL %s | %.3f%%",
+				symbol,
+				buyEx,
+				sellEx,
+				percent,
+			)
+
+			// Execute
+			go executeTrade(symbol, buyEx, sellEx, qty)
+		}
+	}
 }

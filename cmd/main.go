@@ -31,7 +31,7 @@ func main() {
 	// 🔧 CONFIG
 	// -------------------------
 
-	service.CurrentMode = service.Triangular
+	service.CurrentMode = service.Cross
 	service.Simulate = true
 
 	log.Println("Mode:", service.CurrentMode)

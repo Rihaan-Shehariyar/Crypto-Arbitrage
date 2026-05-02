@@ -13,79 +13,111 @@ import (
 
 type BinanceWS struct{}
 
+// ✅ Correct structure for depth stream
+type BinanceDepth struct {
+	Stream string `json:"stream"`
+	Data struct {
+		LastUpdateID int64      `json:"lastUpdateId"`
+		Bids         [][]string `json:"bids"`
+		Asks         [][]string `json:"asks"`
+	} `json:"data"`
+}
+
 func (b BinanceWS) Start(f *feed.Feed, symbols []string) {
 
+	streams := []string{}
+
+	for _, s := range symbols {
+		streams = append(streams, strings.ToLower(s)+"@depth5@100ms")
+	}
+
+	url := "wss://stream.binance.com:9443/stream?streams=" + strings.Join(streams, "/")
+
+	log.Println("[BINANCE WS] connecting:", url)
+
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Println("Binance WS error:", err)
+		return
+	}
+
+	log.Println("[BINANCE WS] connected")
+
 	go func() {
+		defer conn.Close()
+
 		for {
-			// build multiplexed stream URL
-			streams := make([]string, 0, len(symbols))
-			for _, s := range symbols {
-				streams = append(streams, strings.ToLower(s)+"@bookTicker")
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				log.Println("Binance WS read error:", err)
+				return
 			}
 
-			url := "wss://stream.binance.com:9443/stream?streams=" + strings.Join(streams, "/")
+			var msg BinanceDepth
 
-			conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-			if err != nil {
-				log.Println("[BINANCE WS] dial error:", err)
-				time.Sleep(2 * time.Second)
+			if err := json.Unmarshal(message, &msg); err != nil {
 				continue
 			}
 
-			log.Println("[BINANCE WS] connected")
-
-			for {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					log.Println("[BINANCE WS] read error:", err)
-					conn.Close()
-					time.Sleep(1 * time.Second)
-					break // reconnect outer loop
-				}
-
-				// log.Println("RAW:", string(msg))
-
-				var resp map[string]interface{}
-
-				if err := json.Unmarshal(msg, &resp); err != nil {
-					continue
-				}
-
-				data, ok := resp["data"].(map[string]interface{})
-				if !ok {
-					continue
-				}
-
-				// ONLY accept correct fields
-				symbol, ok1 := data["s"].(string)
-				bidStr, ok2 := data["b"].(string)
-				askStr, ok3 := data["a"].(string)
-
-				//   validation
-				if !ok1 || !ok2 || !ok3 {
-					continue
-				}
-
-				bid, err1 := strconv.ParseFloat(bidStr, 64)
-				ask, err2 := strconv.ParseFloat(askStr, 64)
-
-				if err1 != nil || err2 != nil || bid <= 0 || ask <= 0 {
-					continue
-				}
-				// log.Printf("Binance %s | Bid: %.2f Ask: %.2f",
-				// 	symbol,
-				// 	bid,
-				// 	ask,
-				// )
-
-				f.Stream <- feed.Price{
-					Exchange: "binance",
-					Symbol:   symbol,
-					Bid:      bid,
-					Ask:      ask,
-					Time:     time.Now().UnixMilli(),
-				}
+			// 🔥 Extract symbol from stream (CRITICAL FIX)
+			parts := strings.Split(msg.Stream, "@")
+			if len(parts) == 0 {
+				continue
 			}
+
+			symbol := strings.ToUpper(parts[0])
+
+			var bids []feed.Level
+			var asks []feed.Level
+
+			// Parse bids
+			for _, b := range msg.Data.Bids {
+				price, _ := strconv.ParseFloat(b[0], 64)
+				amount, _ := strconv.ParseFloat(b[1], 64)
+
+				bids = append(bids, feed.Level{
+					Price:  price,
+					Amount: amount,
+				})
+			}
+
+			// Parse asks
+			for _, a := range msg.Data.Asks {
+				price, _ := strconv.ParseFloat(a[0], 64)
+				amount, _ := strconv.ParseFloat(a[1], 64)
+
+				asks = append(asks, feed.Level{
+					Price:  price,
+					Amount: amount,
+				})
+			}
+
+			if len(bids) == 0 || len(asks) == 0 {
+				continue
+			}
+
+			// ✅ Update OrderBook
+			feed.UpdateOrderBook("binance", symbol, feed.OrderBook{
+				Bids: bids,
+				Asks: asks,
+				Time: time.Now().UnixMilli(),
+			})
+
+			// ✅ Push into engine
+			f.Stream <- feed.Price{
+				Exchange: "binance",
+				Symbol:   symbol,
+				Bid:      bids[0].Price,
+				Ask:      asks[0].Price,
+				Time:     time.Now().UnixMilli(),
+			}
+
+			// 🔍 Debug (keep for now)
+			log.Printf("Tick: binance %s %.2f %.2f",
+				symbol,
+				asks[0].Price,
+				bids[0].Price,
+			)
 		}
 	}()
 }

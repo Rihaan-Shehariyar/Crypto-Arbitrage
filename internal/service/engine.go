@@ -35,7 +35,7 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 				switch CurrentMode {
 
 				case Cross:
-					handleCross(p.Symbol, brokers)
+					handleCross(p.Symbol)
 
 				case Triangular:
 					handleTriangular(brokers["binance"])
