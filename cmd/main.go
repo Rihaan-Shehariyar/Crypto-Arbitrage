@@ -73,6 +73,13 @@ func main() {
 		"SOL-USDT",
 	})
 
+	gateWS := exchange.GateWS{}
+	gateWS.Start(f, []string{
+		"BTCUSDT",
+		"ETHUSDT",
+		"SOLUSDT",
+	})
+
 	// -------------------------
 	// 💰 BROKER
 	// -------------------------

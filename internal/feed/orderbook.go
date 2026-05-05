@@ -3,6 +3,7 @@ package feed
 import (
 	"log"
 	"strings"
+	"time"
 )
 
 type Level struct {
@@ -17,9 +18,18 @@ type OrderBook struct {
 }
 
 var OrderBooks = make(map[string]map[string]OrderBook)
+var lastUpdate = make(map[string]int64)
 
 func UpdateOrderBook(exchange, symbol string, ob OrderBook) {
 	symbol = strings.ToUpper(symbol)
+
+	now := time.Now().UnixMilli()
+
+	if now-lastUpdate[exchange+symbol] < 100 {
+		return // drop noisy updates
+	}
+
+	lastUpdate[exchange+symbol] = now
 
 	if OrderBooks[symbol] == nil {
 		OrderBooks[symbol] = make(map[string]OrderBook)
