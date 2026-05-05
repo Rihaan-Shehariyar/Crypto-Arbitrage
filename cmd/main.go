@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"crypto-arbitrage/broker"
+	"crypto-arbitrage/internal/auth"
+	"crypto-arbitrage/internal/db"
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
@@ -23,6 +25,8 @@ import (
 func main() {
 
 	godotenv.Load()
+
+	db.Connect()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -129,8 +133,15 @@ func main() {
 	r.Use(cors.Default())
 
 	r.GET("/ws", handler.HandleWebSocket)
-	r.GET("/balance", handler.GetBalanceHandler(brokers))
-	r.GET("/trades", handler.GetTrades)
+	r.POST("/register", handler.RegisterHandler)
+	r.POST("/login", handler.LoginHandler)
+
+	// Protected routes
+	authGroup := r.Group("/")
+	authGroup.Use(auth.AuthMiddleware())
+
+	authGroup.GET("/balance", handler.GetBalanceHandler(brokers))
+	authGroup.GET("/trades", handler.GetTrades)
 
 	srv := &http.Server{
 		Addr:    ":8080",
