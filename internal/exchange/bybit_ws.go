@@ -92,11 +92,8 @@ func (b BybitWS) Start(f *feed.Feed, symbols []string) {
 
 	}()
 }
-
 func processBybitOrderbook(data map[string]interface{}, topic string, f *feed.Feed) {
 
-	// extract symbol from topic
-	// topic = "orderbook.1.BTCUSDT"
 	parts := strings.Split(topic, ".")
 	if len(parts) < 3 {
 		return
@@ -110,47 +107,72 @@ func processBybitOrderbook(data map[string]interface{}, topic string, f *feed.Fe
 		return
 	}
 
-	bids, ok1 := bidsRaw.([]interface{})
-	asks, ok2 := asksRaw.([]interface{})
+	bidsArr, ok1 := bidsRaw.([]interface{})
+	asksArr, ok2 := asksRaw.([]interface{})
 
-	if !ok1 || !ok2 || len(bids) == 0 || len(asks) == 0 {
+	if !ok1 || !ok2 || len(bidsArr) == 0 || len(asksArr) == 0 {
 		return
 	}
 
-	// --- parse best bid ---
-	bidEntry, ok := bids[0].([]interface{})
-	if !ok || len(bidEntry) < 1 {
+	var bids []feed.Level
+	var asks []feed.Level
+
+	// 🔴 parse bids
+	for i := 0; i < len(bidsArr) && i < 10; i++ {
+		entry, ok := bidsArr[i].([]interface{})
+		if !ok || len(entry) < 2 {
+			continue
+		}
+
+		price, _ := strconv.ParseFloat(entry[0].(string), 64)
+		qty, _ := strconv.ParseFloat(entry[1].(string), 64)
+
+		if price > 0 && qty > 0 {
+			bids = append(bids, feed.Level{
+				Price:  price,
+				Amount: qty,
+			})
+		}
+	}
+
+	// 🟢 parse asks
+	for i := 0; i < len(asksArr) && i < 10; i++ {
+		entry, ok := asksArr[i].([]interface{})
+		if !ok || len(entry) < 2 {
+			continue
+		}
+
+		price, _ := strconv.ParseFloat(entry[0].(string), 64)
+		qty, _ := strconv.ParseFloat(entry[1].(string), 64)
+
+		if price > 0 && qty > 0 {
+			asks = append(asks, feed.Level{
+				Price:  price,
+				Amount: qty,
+			})
+		}
+	}
+
+	if len(bids) == 0 || len(asks) == 0 {
 		return
 	}
 
-	// --- parse best ask ---
-	askEntry, ok := asks[0].([]interface{})
-	if !ok || len(askEntry) < 1 {
-		return
-	}
+	// ✅ THIS IS WHAT YOU WERE MISSING
+	feed.UpdateOrderBook("bybit", symbol, feed.OrderBook{
+		Bids: bids,
+		Asks: asks,
+		Time: time.Now().UnixMilli(),
+	})
 
-	bidStr, ok1 := bidEntry[0].(string)
-	askStr, ok2 := askEntry[0].(string)
+	log.Println("📥 OB UPDATE: bybit", symbol)
 
-	if !ok1 || !ok2 {
-		return
-	}
-
-	bid, err1 := strconv.ParseFloat(bidStr, 64)
-	ask, err2 := strconv.ParseFloat(askStr, 64)
-
-	if err1 != nil || err2 != nil || bid <= 0 || ask <= 0 {
-		return
-	}
-
-	// log.Printf(" Bybit %s | Bid: %.2f Ask: %.2f", symbol, bid, ask)
-
+	// (optional) still send price
 	select {
 	case f.Stream <- feed.Price{
 		Exchange: "bybit",
 		Symbol:   symbol,
-		Bid:      bid,
-		Ask:      ask,
+		Bid:      bids[0].Price,
+		Ask:      asks[0].Price,
 		Time:     time.Now().UnixMilli(),
 	}:
 	default:

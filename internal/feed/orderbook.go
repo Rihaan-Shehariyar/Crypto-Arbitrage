@@ -1,6 +1,9 @@
 package feed
 
-import "strings"
+import (
+	"log"
+	"strings"
+)
 
 type Level struct {
 	Price  float64
@@ -21,10 +24,11 @@ func UpdateOrderBook(exchange, symbol string, ob OrderBook) {
 	if OrderBooks[symbol] == nil {
 		OrderBooks[symbol] = make(map[string]OrderBook)
 	}
-
+	log.Println("📥 OB UPDATE:", exchange, symbol)
 	OrderBooks[symbol][exchange] = ob
 }
 
 func GetOrderBooks(symbol string) map[string]OrderBook {
 	return OrderBooks[strings.ToUpper(symbol)]
+
 }

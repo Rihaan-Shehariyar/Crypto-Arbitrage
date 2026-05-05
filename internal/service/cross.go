@@ -3,37 +3,54 @@ package service
 import (
 	"crypto-arbitrage/internal/feed"
 	"log"
+	"sync"
+	"time"
 )
 
+var tradeLock sync.Map
+
+func lock(symbol string) bool {
+	_, loaded := tradeLock.LoadOrStore(symbol, true)
+	return !loaded
+}
+
+func unlock(symbol string) {
+	tradeLock.Delete(symbol)
+}
+
 const (
-	tradeCapital = 100.0
-	feeRate      = 0.001 // 0.1% per trade
-	minSpread    = 0.2   // % threshold
+	feeRate        = 0.001 // 0.1% per trade
+	slippageBuffer = 0.05  // %
+	latencyBuffer  = 0.05  // %
+	minTradeSize   = 10.0  // minimum qty (adjust per asset)
+	maxCapital     = 50.0  // safer capital
 )
+
+var opportunityCount int
 
 func handleCross(symbol string) {
 
 	orderBooks := feed.GetOrderBooks(symbol)
 
-	if orderBooks == nil {
+	if orderBooks == nil || len(orderBooks) < 2 {
 		return
 	}
 
-	// Need at least 2 exchanges
-	if len(orderBooks) < 2 {
-		return
-	}
+	now := time.Now().UnixMilli()
 
 	for buyEx, buyOB := range orderBooks {
-
 		for sellEx, sellOB := range orderBooks {
 
 			if buyEx == sellEx {
 				continue
 			}
 
-			// 🔥 Ignore exchanges without execution support
 			if buyEx == "kucoin" || sellEx == "kucoin" {
+				continue
+			}
+
+			// 🕒 STALE DATA CHECK
+			if now-buyOB.Time > 1000 || now-sellOB.Time > 1000 {
 				continue
 			}
 
@@ -41,46 +58,55 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// Best prices
-			buyPrice := buyOB.Asks[0].Price
-			sellPrice := sellOB.Bids[0].Price
-
-			if buyPrice <= 0 || sellPrice <= 0 {
+			// 📊 SIMULATE DEPTH-AWARE BUY
+			avgBuy, qty := simulateBuy(buyOB.Asks, maxCapital)
+			if qty <= 0 || qty < minTradeSize {
 				continue
 			}
 
-			// Quantity based on capital
-			qty := tradeCapital / buyPrice
-
-			// Apply fees
-			cost := qty * buyPrice * (1 + feeRate)
-			revenue := qty * sellPrice * (1 - feeRate)
-
-			profit := revenue - cost
-
-			percent := (profit / cost) * 100
-
-			// 🔍 Debug log (keep for now)
-			log.Printf("[CROSS CHECK] %s | %s → %s | %.5f%%",
-				symbol, buyEx, sellEx, percent,
-			)
-
-			// 🔥 Real filter
-			if percent < minSpread {
+			// 📊 SIMULATE SELL
+			avgSell := simulateSell(sellOB.Bids, qty)
+			if avgSell == 0 {
 				continue
 			}
 
-			// 🔥 VALID ARBITRAGE
-			log.Printf(
-				"🔥 ARB %s | BUY %s → SELL %s | %.3f%%",
-				symbol,
-				buyEx,
-				sellEx,
-				percent,
-			)
+			// 📉 RAW SPREAD
+			rawSpread := ((avgSell - avgBuy) / avgBuy) * 100
 
-			// Execute
-			go executeTrade(symbol, buyEx, sellEx, qty)
+			// 💰 FEES
+			totalFees := 2 * feeRate * 100
+
+			// 🧠 NET SPREAD
+			netSpread := rawSpread - totalFees - slippageBuffer - latencyBuffer
+
+			log.Printf("[REAL] %s %s→%s raw=%.4f%% net=%.4f%%",
+				symbol, buyEx, sellEx, rawSpread, netSpread)
+
+			// 🚫 NOT PROFITABLE
+			if netSpread <= 0 {
+				continue
+			}
+
+			// 🔐 INVENTORY CHECK
+			if !hasInventory(buyEx, sellEx, symbol, qty, avgBuy) {
+				log.Println("❌ BLOCKED: insufficient inventory")
+				continue
+			}
+
+			// 🔒 LOCK (avoid duplicate trades)
+			if !lock(symbol) {
+				continue
+			}
+
+			opportunityCount++
+
+			log.Printf("🔥 OPPORTUNITY #%d %s %s→%s %.4f%%",
+				opportunityCount, symbol, buyEx, sellEx, netSpread)
+
+			go func() {
+				defer unlock(symbol)
+				executeTrade(symbol, buyEx, sellEx, qty)
+			}()
 		}
 	}
 }

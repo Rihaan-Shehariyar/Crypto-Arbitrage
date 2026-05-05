@@ -22,18 +22,18 @@ type Trade struct {
 
 var (
 	trades []Trade
-	mu     sync.Mutex
+	mut     sync.Mutex
 )
 
 func AddTrade(t Trade) {
-	mu.Lock()
+	mut.Lock()
 	defer mu.Unlock()
 
 	trades = append(trades, t)
 }
 
 func GetTrades() []Trade {
-	mu.Lock()
+	mut.Lock()
 	defer mu.Unlock()
 
 	if trades == nil {
@@ -44,7 +44,7 @@ func GetTrades() []Trade {
 }
 
 func GetTotalPnL() float64 {
-	mu.Lock()
+	mut.Lock()
 	defer mu.Unlock()
 
 	total := 0.0

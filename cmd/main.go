@@ -66,6 +66,13 @@ func main() {
 		"SOL-USDT",
 	})
 
+	okxWS := exchange.OKXWS{}
+	okxWS.Start(f, []string{
+		"BTC-USDT",
+		"ETH-USDT",
+		"SOL-USDT",
+	})
+
 	// -------------------------
 	// 💰 BROKER
 	// -------------------------
@@ -103,7 +110,8 @@ func main() {
 	// -------------------------
 	// 🚀 ENGINE
 	// -------------------------
-
+	service.SetBrokers(brokers)
+	service.StartBalanceWorker(brokers)
 	service.StartEngine(ctx, f, brokers)
 
 	// -------------------------
