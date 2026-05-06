@@ -113,11 +113,11 @@ func (b BinanceWS) Start(f *feed.Feed, symbols []string) {
 			}
 
 			// 🔍 Debug (keep for now)
-			log.Printf("Tick: binance %s %.2f %.2f",
-				symbol,
-				asks[0].Price,
-				bids[0].Price,
-			)
+			// log.Printf("Tick: binance %s %.2f %.2f",
+			// 	symbol,
+			// 	asks[0].Price,
+			// 	bids[0].Price,
+			// )
 		}
 	}()
 }
