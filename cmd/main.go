@@ -122,8 +122,8 @@ func main() {
 	// 🚀 ENGINE
 	// -------------------------
 	service.SetBrokers(brokers)
-	service.StartBalanceWorker(brokers)
-	service.StartEngine(ctx, f, brokers)
+	go service.StartBalanceWorker(brokers)
+	go service.StartEngine(ctx, f, brokers)
 
 	// -------------------------
 	// 🌐 API

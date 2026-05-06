@@ -2,12 +2,14 @@ package handler
 
 import (
 	"crypto-arbitrage/internal/auth"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterHandler(c *gin.Context) {
+	log.Println("REGISTER HIT")
 
 	var body struct {
 		Email    string `json:"email"`

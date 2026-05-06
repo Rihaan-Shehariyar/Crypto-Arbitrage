@@ -11,7 +11,7 @@ import (
 var DB *pgxpool.Pool
 
 func Connect() {
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv("POSTGRES_DSN")
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
