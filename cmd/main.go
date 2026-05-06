@@ -142,6 +142,15 @@ func main() {
 
 	authGroup.GET("/balance", handler.GetBalanceHandler(brokers))
 	authGroup.GET("/trades", handler.GetTrades)
+	authGroup.POST(
+		"/exchange-keys",
+		handler.SaveExchangeKeyHandler,
+	)
+
+	authGroup.GET(
+		"/exchange-keys",
+		handler.GetExchangeKeysHandler,
+	)
 
 	srv := &http.Server{
 		Addr:    ":8080",

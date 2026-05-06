@@ -23,10 +23,22 @@ func SaveExchangeKey(
 	_, err := db.DB.Exec(
 		context.Background(),
 		`
-		INSERT INTO exchange_keys
-		(id, user_id, exchange, api_key, api_secret)
-		VALUES ($1, $2, $3, $4, $5)
-		`,
+	INSERT INTO exchange_keys
+	(
+		id,
+		user_id,
+		exchange,
+		api_key,
+		api_secret
+	)
+	VALUES ($1, $2, $3, $4, $5)
+
+	ON CONFLICT (user_id, exchange)
+
+	DO UPDATE SET
+		api_key = EXCLUDED.api_key,
+		api_secret = EXCLUDED.api_secret
+	`,
 		id,
 		userID,
 		exchange,
