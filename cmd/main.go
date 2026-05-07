@@ -58,7 +58,7 @@ func main() {
 		"ETHUSDT",
 		"SOLUSDT",
 	})
-
+ 
 	kucoinWS := exchange.KucoinWS{}
 	kucoinWS.Start(f, []string{
 		"BTC-USDT",
@@ -127,6 +127,7 @@ func main() {
 	authGroup.Use(auth.AuthMiddleware())
 
 	authGroup.GET("/balance", handler.GetBalanceHandler(brokers))
+	authGroup.GET("/paper/balance", handler.GetPaperBalance)
 	authGroup.GET("/trades", handler.GetTrades)
 	authGroup.POST(
 		"/exchange-keys",

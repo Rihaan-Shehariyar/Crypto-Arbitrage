@@ -9,9 +9,7 @@ var (
 	balMu    sync.RWMutex
 )
 
-// -------------------------
 // UPDATE BALANCE
-// -------------------------
 
 func UpdateBalance(exchange string, data map[string]float64) {
 	balMu.Lock()
@@ -20,9 +18,7 @@ func UpdateBalance(exchange string, data map[string]float64) {
 	balances[exchange] = data
 }
 
-// -------------------------
 // GET BALANCE
-// -------------------------
 
 func GetBalance(exchange string) map[string]float64 {
 	balMu.RLock()

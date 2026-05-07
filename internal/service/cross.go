@@ -43,17 +43,13 @@ func handleCross(symbol string) {
 
 		for sellEx, sellOB := range orderBooks {
 
-			// -------------------------
 			// SAME EXCHANGE
-			// -------------------------
 
 			if buyEx == sellEx {
 				continue
 			}
 
-			// -------------------------
 			// STALE DATA CHECK
-			// -------------------------
 
 			if now-buyOB.Time > 1000 ||
 				now-sellOB.Time > 1000 {
@@ -61,9 +57,7 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
 			// EMPTY ORDERBOOK
-			// -------------------------
 
 			if len(buyOB.Asks) == 0 ||
 				len(sellOB.Bids) == 0 {
@@ -71,9 +65,7 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
 			// DEPTH-AWARE BUY
-			// -------------------------
 
 			avgBuy, qty := simulateBuy(
 				buyOB.Asks,
@@ -91,9 +83,7 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
 			// DEPTH-AWARE SELL
-			// -------------------------
 
 			avgSell := simulateSell(
 				sellOB.Bids,
@@ -104,22 +94,16 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
 			// RAW SPREAD
-			// -------------------------
 
 			rawSpread :=
 				((avgSell - avgBuy) / avgBuy) * 100
 
-			// -------------------------
 			// FEES
-			// -------------------------
 
 			totalFees := 2 * feeRate * 100
 
-			// -------------------------
 			// FINAL NET SPREAD
-			// -------------------------
 
 			netSpread :=
 				rawSpread -
@@ -136,32 +120,28 @@ func handleCross(symbol string) {
 				netSpread,
 			)
 
-			// -------------------------
 			// NOT PROFITABLE
-			// -------------------------
 
-			if netSpread <= 0 {
+			if netSpread <= -100 {
 				continue
 			}
 
-			// -------------------------
 			// INVENTORY CHECK
-			// -------------------------
 
-			if !hasInventory(
-				buyEx,
-				sellEx,
-				symbol,
-				qty,
-				avgBuy,
-			) {
+			// if !hasInventory(
+			// 	buyEx,
+			// 	sellEx,
+			// 	symbol,
+			// 	qty,
+			// 	avgBuy,
+			// ) {
 
-				log.Println(
-					"BLOCKED: insufficient inventory",
-				)
+			// 	log.Println(
+			// 		"BLOCKED: insufficient inventory",
+			// 	)
 
-				continue
-			}
+			// 	continue
+			// }
 
 			// -------------------------
 			// LOCK SYMBOL
@@ -173,12 +153,10 @@ func handleCross(symbol string) {
 
 			opportunityCount++
 
-			// -------------------------
 			// OPPORTUNITY FOUND
-			// -------------------------
 
 			log.Printf(
-				"🔥 OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
+				"OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
 				opportunityCount,
 				symbol,
 				buyEx,
@@ -186,9 +164,7 @@ func handleCross(symbol string) {
 				netSpread,
 			)
 
-			// -------------------------
 			// PAPER TRADE
-			// -------------------------
 
 			go func(
 				symbol string,
@@ -201,7 +177,7 @@ func handleCross(symbol string) {
 				defer unlock(symbol)
 
 				log.Printf(
-					"🧪 PAPER EXECUTION %s | BUY %s → SELL %s",
+					"PAPER EXECUTION %s | BUY %s → SELL %s",
 					symbol,
 					buyEx,
 					sellEx,
@@ -250,7 +226,7 @@ func handleCross(symbol string) {
 					},
 				)
 				log.Printf(
-					"✅ PAPER TRADE CLOSED | %s | PnL %.4f USDT (%.4f%%)",
+					"✅PAPER TRADE CLOSED | %s | PnL %.4f USDT (%.4f%%)",
 					symbol,
 					profitUSDT,
 					profitPercent,

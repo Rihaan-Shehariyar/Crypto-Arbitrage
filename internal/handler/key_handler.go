@@ -8,9 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// -------------------------
 // SAVE EXCHANGE KEYS
-// -------------------------
 
 func SaveExchangeKeyHandler(c *gin.Context) {
 

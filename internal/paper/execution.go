@@ -5,9 +5,7 @@ import (
 	"strings"
 )
 
-// -------------------------
 // PAPER BUY
-// -------------------------
 
 func Buy(
 	symbol string,
@@ -46,9 +44,7 @@ func Buy(
 	printBalances()
 }
 
-// -------------------------
 // PAPER SELL
-// -------------------------
 
 func Sell(
 	symbol string,
@@ -88,9 +84,7 @@ func Sell(
 	printBalances()
 }
 
-// -------------------------
 // PRINT WALLET
-// -------------------------
 
 func printBalances() {
 

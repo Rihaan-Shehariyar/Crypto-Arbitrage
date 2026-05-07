@@ -42,4 +42,6 @@ func AddTrade(t Trade) {
 		[]Trade{t},
 		Trades...,
 	)
+
+	SaveTrade(t)
 }
