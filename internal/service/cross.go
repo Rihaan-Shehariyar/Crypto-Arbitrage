@@ -49,7 +49,7 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// 🕒 STALE DATA CHECK
+			//  STALE DATA CHECK
 			if now-buyOB.Time > 1000 || now-sellOB.Time > 1000 {
 				continue
 			}
@@ -58,49 +58,49 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// 📊 SIMULATE DEPTH-AWARE BUY
+			//  SIMULATE DEPTH-AWARE BUY
 			avgBuy, qty := simulateBuy(buyOB.Asks, maxCapital)
 			if qty <= 0 || qty < minTradeSize {
 				continue
 			}
 
-			// 📊 SIMULATE SELL
+			// SIMULATE SELL
 			avgSell := simulateSell(sellOB.Bids, qty)
 			if avgSell == 0 {
 				continue
 			}
 
-			// 📉 RAW SPREAD
+			// RAW SPREAD
 			rawSpread := ((avgSell - avgBuy) / avgBuy) * 100
 
-			// 💰 FEES
+			// FEES
 			totalFees := 2 * feeRate * 100
 
-			// 🧠 NET SPREAD
+			//  NET SPREAD
 			netSpread := rawSpread - totalFees - slippageBuffer - latencyBuffer
 
 			log.Printf("[REAL] %s %s→%s raw=%.4f%% net=%.4f%%",
 				symbol, buyEx, sellEx, rawSpread, netSpread)
 
-			// 🚫 NOT PROFITABLE
+			//  NOT PROFITABLE
 			if netSpread <= 0 {
 				continue
 			}
 
-			// 🔐 INVENTORY CHECK
+			// INVENTORY CHECK
 			if !hasInventory(buyEx, sellEx, symbol, qty, avgBuy) {
-				log.Println("❌ BLOCKED: insufficient inventory")
+				log.Println("BLOCKED: insufficient inventory")
 				continue
 			}
 
-			// 🔒 LOCK (avoid duplicate trades)
+			// LOCK (avoid duplicate trades)
 			if !lock(symbol) {
 				continue
 			}
 
 			opportunityCount++
 
-			log.Printf("🔥 OPPORTUNITY #%d %s %s→%s %.4f%%",
+			log.Printf("OPPORTUNITY #%d %s %s→%s %.4f%%",
 				opportunityCount, symbol, buyEx, sellEx, netSpread)
 
 			go func() {

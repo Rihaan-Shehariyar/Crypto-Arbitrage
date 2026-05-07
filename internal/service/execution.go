@@ -6,16 +6,16 @@ import (
 
 func executeTrade(symbol, buyEx, sellEx string, qty float64) {
 
-	log.Printf("🚀 EXECUTION %s %s→%s qty=%.6f",
+	log.Printf(" EXECUTION %s %s→%s qty=%.6f",
 		symbol, buyEx, sellEx, qty)
 
 	if qty <= 0 {
 		return
 	}
 
-	// ⚠️ LIMIT SIZE (extra safety)
+	//  LIMIT SIZE (extra safety)
 	if symbol == "BTCUSDT" && qty > 0.01 {
-		log.Println("⚠️ size too large, skipping")
+		log.Println("size too large, skipping")
 		return
 	}
 
@@ -28,36 +28,36 @@ func executeTrade(symbol, buyEx, sellEx string, qty float64) {
 	buyBroker := Brokers[buyEx]
 	sellBroker := Brokers[sellEx]
 
-	// 🟢 BUY
-	log.Println("🟢 BUY placing")
+	//  BUY
+	log.Println("BUY placing")
 	buyID, err := buyBroker.MarketBuy(symbol, qty)
 	if err != nil {
-		log.Println("❌ BUY failed:", err)
+		log.Println(" BUY failed:", err)
 		return
 	}
 
 	buyInfo, ok := waitForExecution(buyBroker, symbol, buyID, qty)
 	if !ok {
-		log.Println("❌ BUY not filled")
+		log.Println(" BUY not filled")
 		return
 	}
 
 	filled := buyInfo.FilledQty
-	log.Println("✅ BUY filled:", filled)
+	log.Println("BUY filled:", filled)
 
-	// 🔴 SELL
-	log.Println("🔴 SELL placing")
+	// SELL
+	log.Println("SELL placing")
 	sellID, err := sellBroker.MarketSell(symbol, filled)
 	if err != nil {
-		log.Println("❌ SELL failed:", err)
+		log.Println("SELL failed:", err)
 		return
 	}
 
 	_, ok = waitForExecution(sellBroker, symbol, sellID, filled)
 	if !ok {
-		log.Println("❌ SELL not filled")
+		log.Println(" SELL not filled")
 		return
 	}
 
-	log.Println("✅ TRADE COMPLETE")
+	log.Println("TRADE COMPLETE")
 }

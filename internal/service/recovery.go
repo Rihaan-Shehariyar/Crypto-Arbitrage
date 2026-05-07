@@ -10,11 +10,11 @@ import (
 func emergencySell(b broker.Broker, symbol string, qty float64) {
 	time.Sleep(500 * time.Millisecond)
 
-	log.Println("🚨 EMERGENCY SELL")
+	log.Println(" EMERGENCY SELL")
 
 	_, err := b.MarketSell(symbol, qty)
 	if err != nil {
-		log.Println("❌ Emergency sell failed:", err)
+		log.Println("Emergency sell failed:", err)
 	}
 }
 
@@ -26,10 +26,10 @@ func retrySell(b broker.Broker, symbol string, qty float64) {
 
 		_, err := b.MarketSell(symbol, qty)
 		if err == nil {
-			log.Println("✅ Retry sell success")
+			log.Println("Retry sell success")
 			return
 		}
 	}
 
-	log.Println("❌ Retry sell failed → manual intervention needed")
+	log.Println("Retry sell failed → manual intervention needed")
 }

@@ -6,8 +6,13 @@ import BalancePanel from "./components/BalancePanel";
 
 
 function App() {
-  const { data, logs } = useWebSocket("ws://localhost:8080/ws");
-  const balance = useBalance();
+const {
+  prices,
+  opportunities,
+  logs,
+} = useWebSocket(
+  "ws://localhost:8080/ws"); 
+ const balance = useBalance();
 
 
    return (
@@ -20,8 +25,7 @@ function App() {
 
         <BalancePanel balance={balance} />
 
-        <OpportunityTable data={data} />
-
+<OpportunityTable data={opportunities} />
         <LogsPanel logs={logs} />
 
       </div>

@@ -27,9 +27,8 @@ func CreateUserBrokers(
 				k.APISecret,
 			)
 
-		// -------------------------
 		// FUTURE EXCHANGES
-		// -------------------------
+	
 
 		case "bybit":
 

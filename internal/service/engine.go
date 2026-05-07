@@ -31,23 +31,28 @@ const (
 // StartEngine runs the core arbitrage loop
 func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Broker) {
 
-	log.Println("🚀 Engine Started")
+	log.Println(" Engine Started")
 
 	for {
 		select {
 
 		case <-ctx.Done():
-			log.Println("🛑 Engine stopped")
+			log.Println("Engine stopped")
 			return
 
 		case p := <-f.Stream:
 
+			log.Printf(
+				"[PRICE] %-8s %-10s | Bid: %.8f | Ask: %.8f",
+				p.Exchange,
+				p.Symbol,
+				p.Bid,
+				p.Ask,
+			)
 			symbol := p.Symbol
 			now := time.Now().UnixMilli()
 
-			// -------------------------
-			// 🔒 THROTTLE PER SYMBOL
-			// -------------------------
+			// THROTTLE PER SYMBOL
 			mu.Lock()
 			last, ok := lastRun[symbol]
 			if ok && now-last < minIntervalMs {
@@ -57,18 +62,14 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 			lastRun[symbol] = now
 			mu.Unlock()
 
-			// -------------------------
-			// 📊 ORDERBOOK CHECK
-			// -------------------------
+			//  ORDERBOOK CHECK
 			orderBooks := feed.GetOrderBooks(symbol)
 
 			if orderBooks == nil || len(orderBooks) < 2 {
 				continue
 			}
 
-			// -------------------------
-			// 🧾 PRINT STATUS (every 2s)
-			// -------------------------
+			//  PRINT STATUS
 			mu.Lock()
 			lastP, ok := lastPrint[symbol]
 			if !ok || now-lastP > printIntervalMs {
@@ -77,9 +78,7 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 			}
 			mu.Unlock()
 
-			// -------------------------
-			// 🔄 RUN STRATEGY
-			// -------------------------
+			//  RUN STRATEGY
 			switch CurrentMode {
 
 			case Cross:
@@ -89,7 +88,7 @@ func StartEngine(ctx context.Context, f *feed.Feed, brokers map[string]broker.Br
 				// handleTriangular()
 
 			default:
-				log.Println("⚠️ Unknown mode")
+				log.Println("Unknown mode")
 			}
 		}
 	}

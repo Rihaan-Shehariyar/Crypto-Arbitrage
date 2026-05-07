@@ -7,9 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// -------------------------
 // SAVE EXCHANGE KEY
-// -------------------------
 
 func SaveExchangeKey(
 	userID,
@@ -49,9 +47,7 @@ func SaveExchangeKey(
 	return err
 }
 
-// -------------------------
 // GET USER KEYS
-// -------------------------
 
 func GetUserKeys(
 	userID string,

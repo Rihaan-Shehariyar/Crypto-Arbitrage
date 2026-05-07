@@ -31,9 +31,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// -------------------------
-	// 🔧 CONFIG
-	// -------------------------
+	//  CONFIG
 
 	service.CurrentMode = service.Cross
 	service.Simulate = true
@@ -41,9 +39,7 @@ func main() {
 	log.Println("Mode:", service.CurrentMode)
 	log.Println("Simulation:", service.Simulate)
 
-	// -------------------------
-	// 📡 FEED
-	// -------------------------
+	//  FEED
 
 	f := feed.NewFeed()
 
@@ -84,9 +80,7 @@ func main() {
 		"SOLUSDT",
 	})
 
-	// -------------------------
-	// 💰 BROKER
-	// -------------------------
+	// BROKER
 
 	binanceBroker := broker.NewBinance(
 		os.Getenv("BINANCE_KEY"),
@@ -99,9 +93,7 @@ func main() {
 
 	log.Println("Brokers initialized")
 
-	// -------------------------
-	// 🔺 TRIANGLES
-	// -------------------------
+	// TRIANGLES
 
 	symbols, err := service.FetchBinanceSymbols()
 	if err != nil {
@@ -111,23 +103,17 @@ func main() {
 	service.InitTriangles(symbols)
 	log.Println("Triangles initialized")
 
-	// -------------------------
-	// ⏳ WAIT FOR DATA
-	// -------------------------
+	//  WAIT FOR DATA
 
 	log.Println("Waiting for market data...")
 	time.Sleep(2 * time.Second)
 
-	// -------------------------
-	// 🚀 ENGINE
-	// -------------------------
+	// ENGINE
 	service.SetBrokers(brokers)
 	go service.StartBalanceWorker(brokers)
 	go service.StartEngine(ctx, f, brokers)
 
-	// -------------------------
-	// 🌐 API
-	// -------------------------
+	// API
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -164,9 +150,7 @@ func main() {
 		}
 	}()
 
-	// -------------------------
-	// 🛑 SHUTDOWN
-	// -------------------------
+	//  SHUTDOWN
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

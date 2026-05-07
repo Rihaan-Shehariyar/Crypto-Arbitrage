@@ -55,5 +55,5 @@ func Login(email, password string) (string, error) {
 		return "", errors.New("invalid credentials")
 	}
 
-	return user.ID, nil // token (simple)
+	return user.ID, nil 
 }
