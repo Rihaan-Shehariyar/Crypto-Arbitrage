@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/paper"
 	"log"
 	"sync"
 	"time"
@@ -19,11 +20,11 @@ func unlock(symbol string) {
 }
 
 const (
-	feeRate        = 0.001 // 0.1% per trade
+	feeRate        = 0.001 // 0.1%
 	slippageBuffer = 0.05  // %
 	latencyBuffer  = 0.05  // %
-	minTradeSize   = 10.0  // minimum qty (adjust per asset)
-	maxCapital     = 50.0  // safer capital
+	minTradeValue  = 10.0  // minimum USDT trade
+	maxCapital     = 50.0  // paper trade capital
 )
 
 var opportunityCount int
@@ -39,74 +40,229 @@ func handleCross(symbol string) {
 	now := time.Now().UnixMilli()
 
 	for buyEx, buyOB := range orderBooks {
+
 		for sellEx, sellOB := range orderBooks {
+
+			// -------------------------
+			// SAME EXCHANGE
+			// -------------------------
 
 			if buyEx == sellEx {
 				continue
 			}
 
-			if buyEx == "kucoin" || sellEx == "kucoin" {
+			// -------------------------
+			// STALE DATA CHECK
+			// -------------------------
+
+			if now-buyOB.Time > 1000 ||
+				now-sellOB.Time > 1000 {
+
 				continue
 			}
 
-			//  STALE DATA CHECK
-			if now-buyOB.Time > 1000 || now-sellOB.Time > 1000 {
+			// -------------------------
+			// EMPTY ORDERBOOK
+			// -------------------------
+
+			if len(buyOB.Asks) == 0 ||
+				len(sellOB.Bids) == 0 {
+
 				continue
 			}
 
-			if len(buyOB.Asks) == 0 || len(sellOB.Bids) == 0 {
+			// -------------------------
+			// DEPTH-AWARE BUY
+			// -------------------------
+
+			avgBuy, qty := simulateBuy(
+				buyOB.Asks,
+				maxCapital,
+			)
+
+			if qty <= 0 {
 				continue
 			}
 
-			//  SIMULATE DEPTH-AWARE BUY
-			avgBuy, qty := simulateBuy(buyOB.Asks, maxCapital)
-			if qty <= 0 || qty < minTradeSize {
+			// minimum trade value
+			tradeValue := qty * avgBuy
+
+			if tradeValue < minTradeValue {
 				continue
 			}
 
-			// SIMULATE SELL
-			avgSell := simulateSell(sellOB.Bids, qty)
+			// -------------------------
+			// DEPTH-AWARE SELL
+			// -------------------------
+
+			avgSell := simulateSell(
+				sellOB.Bids,
+				qty,
+			)
+
 			if avgSell == 0 {
 				continue
 			}
 
+			// -------------------------
 			// RAW SPREAD
-			rawSpread := ((avgSell - avgBuy) / avgBuy) * 100
+			// -------------------------
 
+			rawSpread :=
+				((avgSell - avgBuy) / avgBuy) * 100
+
+			// -------------------------
 			// FEES
+			// -------------------------
+
 			totalFees := 2 * feeRate * 100
 
-			//  NET SPREAD
-			netSpread := rawSpread - totalFees - slippageBuffer - latencyBuffer
+			// -------------------------
+			// FINAL NET SPREAD
+			// -------------------------
 
-			log.Printf("[REAL] %s %s→%s raw=%.4f%% net=%.4f%%",
-				symbol, buyEx, sellEx, rawSpread, netSpread)
+			netSpread :=
+				rawSpread -
+					totalFees -
+					slippageBuffer -
+					latencyBuffer
 
-			//  NOT PROFITABLE
+			log.Printf(
+				"[CHECK] %s %s→%s | raw=%.4f%% net=%.4f%%",
+				symbol,
+				buyEx,
+				sellEx,
+				rawSpread,
+				netSpread,
+			)
+
+			// -------------------------
+			// NOT PROFITABLE
+			// -------------------------
+
 			if netSpread <= 0 {
 				continue
 			}
 
+			// -------------------------
 			// INVENTORY CHECK
-			if !hasInventory(buyEx, sellEx, symbol, qty, avgBuy) {
-				log.Println("BLOCKED: insufficient inventory")
+			// -------------------------
+
+			if !hasInventory(
+				buyEx,
+				sellEx,
+				symbol,
+				qty,
+				avgBuy,
+			) {
+
+				log.Println(
+					"BLOCKED: insufficient inventory",
+				)
+
 				continue
 			}
 
-			// LOCK (avoid duplicate trades)
+			// -------------------------
+			// LOCK SYMBOL
+			// -------------------------
+
 			if !lock(symbol) {
 				continue
 			}
 
 			opportunityCount++
 
-			log.Printf("OPPORTUNITY #%d %s %s→%s %.4f%%",
-				opportunityCount, symbol, buyEx, sellEx, netSpread)
+			// -------------------------
+			// OPPORTUNITY FOUND
+			// -------------------------
 
-			go func() {
+			log.Printf(
+				"🔥 OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
+				opportunityCount,
+				symbol,
+				buyEx,
+				sellEx,
+				netSpread,
+			)
+
+			// -------------------------
+			// PAPER TRADE
+			// -------------------------
+
+			go func(
+				symbol string,
+				buyEx string,
+				sellEx string,
+				avgBuy float64,
+				avgSell float64,
+			) {
+
 				defer unlock(symbol)
-				executeTrade(symbol, buyEx, sellEx, qty)
-			}()
+
+				log.Printf(
+					"🧪 PAPER EXECUTION %s | BUY %s → SELL %s",
+					symbol,
+					buyEx,
+					sellEx,
+				)
+
+				// PAPER BUY
+				paper.Buy(
+					symbol,
+					avgBuy,
+					maxCapital,
+				)
+
+				// simulate small execution delay
+				time.Sleep(500 * time.Millisecond)
+
+				// PAPER SELL
+				paper.Sell(
+					symbol,
+					avgSell,
+				)
+
+				profitUSDT :=
+					(avgSell - avgBuy) * qty
+
+				profitPercent :=
+					((avgSell - avgBuy) / avgBuy) * 100
+
+				paper.AddTrade(
+					paper.Trade{
+						Symbol: symbol,
+
+						BuyExchange:  buyEx,
+						SellExchange: sellEx,
+
+						BuyPrice:  avgBuy,
+						SellPrice: avgSell,
+
+						Quantity: qty,
+
+						ProfitUSDT:    profitUSDT,
+						ProfitPercent: profitPercent,
+
+						Status: "CLOSED",
+
+						Time: time.Now(),
+					},
+				)
+				log.Printf(
+					"✅ PAPER TRADE CLOSED | %s | PnL %.4f USDT (%.4f%%)",
+					symbol,
+					profitUSDT,
+					profitPercent,
+				)
+
+			}(
+				symbol,
+				buyEx,
+				sellEx,
+				avgBuy,
+				avgSell,
+			)
 		}
 	}
 }
