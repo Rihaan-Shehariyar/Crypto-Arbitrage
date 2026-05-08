@@ -50,42 +50,60 @@ func main() {
 
 	f := feed.NewFeed()
 
-	binanceWS := exchange.BinanceWS{}
-	binanceWS.Start(f, []string{
-		"BTCUSDT",
-		"ETHUSDT",
-		"SOLUSDT",
-		"ETHBTC",
-		"SOLBTC",
-	})
+	binance := &exchange.BinanceWS{}
 
-	bybitWS := exchange.BybitWS{}
-	bybitWS.Start(f, []string{
-		"BTCUSDT",
-		"ETHUSDT",
-		"SOLUSDT",
-	})
+	exchange.RunExchange(
+		binance,
+		[]string{
+			"BTCUSDT",
+			"ETHUSDT",
+			"SOLUSDT",
+		},
+	)
 
-	kucoinWS := exchange.KucoinWS{}
-	kucoinWS.Start(f, []string{
-		"BTC-USDT",
-		"ETH-USDT",
-		"SOL-USDT",
-	})
+	bybit := &exchange.BybitWS{}
 
-	okxWS := exchange.OKXWS{}
-	okxWS.Start(f, []string{
-		"BTC-USDT",
-		"ETH-USDT",
-		"SOL-USDT",
-	})
+	exchange.RunExchange(
+		bybit,
+		[]string{
+			"BTCUSDT",
+			"ETHUSDT",
+			"SOLUSDT",
+		},
+	)
 
-	gateWS := exchange.GateWS{}
-	gateWS.Start(f, []string{
-		"BTCUSDT",
-		"ETHUSDT",
-		"SOLUSDT",
-	})
+	kucoin := &exchange.KucoinWS{}
+
+	exchange.RunExchange(
+		kucoin,
+		[]string{
+			"BTCUSDT",
+			"ETHUSDT",
+			"SOLUSDT",
+		},
+	)
+
+	gate := &exchange.GateWS{}
+
+	exchange.RunExchange(
+		gate,
+		[]string{
+			"BTCUSDT",
+			"ETHUSDT",
+			"SOLUSDT",
+		},
+	)
+
+	okx := &exchange.OKXWS{}
+
+	exchange.RunExchange(
+		okx,
+		[]string{
+			"BTCUSDT",
+			"ETHUSDT",
+			"SOLUSDT",
+		},
+	)
 
 	// BROKER
 

@@ -9,6 +9,7 @@ import (
 type Level struct {
 	Price  float64
 	Amount float64
+    Qty float64
 }
 
 type OrderBook struct {

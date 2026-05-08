@@ -3,6 +3,7 @@ package exchange
 import (
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -11,113 +12,207 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type BinanceWS struct{}
-
-// ✅ Correct structure for depth stream
-type BinanceDepth struct {
-	Stream string `json:"stream"`
-	Data struct {
-		LastUpdateID int64      `json:"lastUpdateId"`
-		Bids         [][]string `json:"bids"`
-		Asks         [][]string `json:"asks"`
-	} `json:"data"`
+type BinanceWS struct {
+	conn *websocket.Conn
 }
 
-func (b BinanceWS) Start(f *feed.Feed, symbols []string) {
+// -----------------------------------
+// NAME
+// -----------------------------------
 
-	streams := []string{}
+func (b *BinanceWS) Name() string {
+	return "BINANCE"
+}
+
+// -----------------------------------
+// CONNECT
+// -----------------------------------
+
+func (b *BinanceWS) Connect(
+	symbols []string,
+) error {
+
+	var streams []string
 
 	for _, s := range symbols {
-		streams = append(streams, strings.ToLower(s)+"@depth5@100ms")
+
+		s = strings.ToLower(s)
+
+		streams = append(
+			streams,
+			fmt.Sprintf(
+				"%s@depth5@100ms",
+				s,
+			),
+		)
 	}
 
-	url := "wss://stream.binance.com:9443/stream?streams=" + strings.Join(streams, "/")
+	wsURL :=
+		"wss://stream.binance.com:9443/stream?streams=" +
+			strings.Join(streams, "/")
 
-	log.Println("[BINANCE WS] connecting:", url)
+	log.Println(
+		"[BINANCE WS] connecting:",
+		wsURL,
+	)
 
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(
+		wsURL,
+		nil,
+	)
+
 	if err != nil {
-		log.Println("Binance WS error:", err)
-		return
+		return err
 	}
 
-	log.Println("[BINANCE WS] connected")
+	b.conn = conn
 
-	go func() {
-		defer conn.Close()
+	log.Println(
+		"[BINANCE WS] connected",
+	)
 
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Binance WS read error:", err)
-				return
-			}
+	return nil
+}
 
-			var msg BinanceDepth
+// -----------------------------------
+// SUBSCRIBE
+// -----------------------------------
 
-			if err := json.Unmarshal(message, &msg); err != nil {
-				continue
-			}
+// Binance combined streams
+// already subscribe through URL.
+// so nothing required here.
 
-			// 🔥 Extract symbol from stream (CRITICAL FIX)
-			parts := strings.Split(msg.Stream, "@")
-			if len(parts) == 0 {
-				continue
-			}
+func (b *BinanceWS) Subscribe() error {
+	return nil
+}
 
-			symbol := strings.ToUpper(parts[0])
+// -----------------------------------
+// READ LOOP
+// -----------------------------------
 
-			var bids []feed.Level
-			var asks []feed.Level
+func (b *BinanceWS) ReadLoop() error {
 
-			// Parse bids
-			for _, b := range msg.Data.Bids {
-				price, _ := strconv.ParseFloat(b[0], 64)
-				amount, _ := strconv.ParseFloat(b[1], 64)
+	for {
 
-				bids = append(bids, feed.Level{
-					Price:  price,
-					Amount: amount,
-				})
-			}
+		// read timeout safety
+		b.conn.SetReadDeadline(
+			time.Now().Add(
+				30 * time.Second,
+			),
+		)
 
-			// Parse asks
-			for _, a := range msg.Data.Asks {
-				price, _ := strconv.ParseFloat(a[0], 64)
-				amount, _ := strconv.ParseFloat(a[1], 64)
+		_, msg, err := b.conn.ReadMessage()
 
-				asks = append(asks, feed.Level{
-					Price:  price,
-					Amount: amount,
-				})
-			}
-
-			if len(bids) == 0 || len(asks) == 0 {
-				continue
-			}
-
-			// ✅ Update OrderBook
-			feed.UpdateOrderBook("binance", symbol, feed.OrderBook{
-				Bids: bids,
-				Asks: asks,
-				Time: time.Now().UnixMilli(),
-			})
-
-			// ✅ Push into engine
-			f.Stream <- feed.Price{
-				Exchange: "binance",
-				Symbol:   symbol,
-				Bid:      bids[0].Price,
-				Ask:      asks[0].Price,
-				Time:     time.Now().UnixMilli(),
-			}
-
-			// 🔍 Debug (keep for now)
-			// log.Printf("Tick: binance %s %.2f %.2f",
-			// 	symbol,
-			// 	asks[0].Price,
-			// 	bids[0].Price,
-			// )
+		if err != nil {
+			return err
 		}
-	}()
+
+		var raw struct {
+			Stream string `json:"stream"`
+
+			Data struct {
+				Symbol string `json:"s"`
+
+				Bids [][]string `json:"b"`
+
+				Asks [][]string `json:"a"`
+			} `json:"data"`
+		}
+
+		err = json.Unmarshal(
+			msg,
+			&raw,
+		)
+
+		if err != nil {
+			continue
+		}
+
+		ob := feed.OrderBook{
+			Time: time.Now().UnixMilli(),
+		}
+
+		// -------------------------
+		// BIDS
+		// -------------------------
+
+		for _, b := range raw.Data.Bids {
+
+			price := parseFloat(b[0])
+
+			qty := parseFloat(b[1])
+
+			ob.Bids = append(
+				ob.Bids,
+				feed.Level{
+					Price: price,
+					Qty:   qty,
+				},
+			)
+		}
+
+		// -------------------------
+		// ASKS
+		// -------------------------
+
+		for _, a := range raw.Data.Asks {
+
+			price := parseFloat(a[0])
+
+			qty := parseFloat(a[1])
+
+			ob.Asks = append(
+				ob.Asks,
+				feed.Level{
+					Price: price,
+					Qty:   qty,
+				},
+			)
+		}
+
+		symbol :=
+			strings.ToUpper(
+				raw.Data.Symbol,
+			)
+
+		feed.UpdateOrderBook(
+			"binance",
+			symbol,
+			ob,
+		)
+	}
+}
+
+// -----------------------------------
+// CLOSE
+// -----------------------------------
+
+func (b *BinanceWS) Close() error {
+
+	if b.conn != nil {
+
+		log.Println(
+			"[BINANCE WS] closed",
+		)
+
+		return b.conn.Close()
+	}
+
+	return nil
+}
+
+func parseFloat(
+	value string,
+) float64 {
+
+	f, err := strconv.ParseFloat(
+		value,
+		64,
+	)
+
+	if err != nil {
+		return 0
+	}
+
+	return f
 }

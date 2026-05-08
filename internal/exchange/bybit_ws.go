@@ -4,177 +4,211 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-type BybitWS struct{}
+type BybitWS struct {
+	conn *websocket.Conn
 
-func (b BybitWS) Start(f *feed.Feed, symbols []string) {
-	go func() {
-		for {
-
-			url := "wss://stream.bybit.com/v5/public/spot"
-
-			log.Println("[BYBIT WS] connecting to:", url)
-
-			conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-			if err != nil {
-				log.Println("[BYBIT WS] dial error:", err)
-				time.Sleep(2 * time.Second)
-				continue
-			}
-
-			log.Println("[BYBIT WS] connected")
-
-			// 🔥 subscribe
-			args := []string{}
-			for _, s := range symbols {
-				args = append(args, "orderbook.1."+s)
-			}
-
-			subMsg := map[string]interface{}{
-				"op":   "subscribe",
-				"args": args,
-			}
-
-			err = conn.WriteJSON(subMsg)
-			if err != nil {
-				log.Println("[BYBIT WS] subscribe error:", err)
-				conn.Close()
-				continue
-			}
-
-			log.Println("[BYBIT WS] subscribed:", args)
-
-			for {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					log.Println("[BYBIT WS] read error:", err)
-					conn.Close()
-					break
-				}
-
-				// 🔍 DEBUG (enable if needed)
-				// log.Println("[BYBIT RAW]", string(msg))
-
-				var resp map[string]interface{}
-
-				if err := json.Unmarshal(msg, &resp); err != nil {
-					continue
-				}
-
-				// ignore non-data messages
-				topic, ok := resp["topic"].(string)
-				if !ok || !strings.HasPrefix(topic, "orderbook.") {
-					continue
-				}
-
-				data := resp["data"]
-
-				switch d := data.(type) {
-
-				case map[string]interface{}:
-					processBybitOrderbook(d, topic, f)
-
-				case []interface{}:
-					for _, item := range d {
-						if m, ok := item.(map[string]interface{}); ok {
-							processBybitOrderbook(m, topic, f)
-						}
-					}
-				}
-			}
-		}
-
-	}()
+	symbols []string
 }
-func processBybitOrderbook(data map[string]interface{}, topic string, f *feed.Feed) {
 
-	parts := strings.Split(topic, ".")
-	if len(parts) < 3 {
-		return
+// -----------------------------------
+// NAME
+// -----------------------------------
+
+func (b *BybitWS) Name() string {
+	return "BYBIT"
+}
+
+// -----------------------------------
+// CONNECT
+// -----------------------------------
+
+func (b *BybitWS) Connect(
+	symbols []string,
+) error {
+
+	b.symbols = symbols
+
+	wsURL :=
+		"wss://stream.bybit.com/v5/public/spot"
+
+	log.Println(
+		"[BYBIT WS] connecting:",
+		wsURL,
+	)
+
+	conn, _, err := websocket.DefaultDialer.Dial(
+		wsURL,
+		nil,
+	)
+
+	if err != nil {
+		return err
 	}
-	symbol := parts[2]
 
-	bidsRaw, ok1 := data["b"]
-	asksRaw, ok2 := data["a"]
+	b.conn = conn
 
-	if !ok1 || !ok2 {
-		return
+	log.Println(
+		"[BYBIT WS] connected",
+	)
+
+	return nil
+}
+
+// -----------------------------------
+// SUBSCRIBE
+// -----------------------------------
+
+func (b *BybitWS) Subscribe() error {
+
+	var args []string
+
+	for _, s := range b.symbols {
+
+		args = append(
+			args,
+			"orderbook.1."+strings.ToUpper(s),
+		)
 	}
 
-	bidsArr, ok1 := bidsRaw.([]interface{})
-	asksArr, ok2 := asksRaw.([]interface{})
-
-	if !ok1 || !ok2 || len(bidsArr) == 0 || len(asksArr) == 0 {
-		return
+	payload := map[string]interface{}{
+		"op":   "subscribe",
+		"args": args,
 	}
 
-	var bids []feed.Level
-	var asks []feed.Level
+	err := b.conn.WriteJSON(payload)
 
-	// 🔴 parse bids
-	for i := 0; i < len(bidsArr) && i < 10; i++ {
-		entry, ok := bidsArr[i].([]interface{})
-		if !ok || len(entry) < 2 {
+	if err != nil {
+		return err
+	}
+
+	log.Printf(
+		"[BYBIT WS] subscribed: %v",
+		args,
+	)
+
+	return nil
+}
+
+// -----------------------------------
+// READ LOOP
+// -----------------------------------
+
+func (b *BybitWS) ReadLoop() error {
+
+	for {
+
+		b.conn.SetReadDeadline(
+			time.Now().Add(
+				30 * time.Second,
+			),
+		)
+
+		_, msg, err := b.conn.ReadMessage()
+
+		if err != nil {
+			return err
+		}
+
+		var raw struct {
+			Topic string `json:"topic"`
+
+			Data struct {
+				Symbol string `json:"s"`
+
+				Bids [][]string `json:"b"`
+
+				Asks [][]string `json:"a"`
+			} `json:"data"`
+		}
+
+		err = json.Unmarshal(
+			msg,
+			&raw,
+		)
+
+		if err != nil {
 			continue
 		}
 
-		price, _ := strconv.ParseFloat(entry[0].(string), 64)
-		qty, _ := strconv.ParseFloat(entry[1].(string), 64)
-
-		if price > 0 && qty > 0 {
-			bids = append(bids, feed.Level{
-				Price:  price,
-				Amount: qty,
-			})
-		}
-	}
-
-	// 🟢 parse asks
-	for i := 0; i < len(asksArr) && i < 10; i++ {
-		entry, ok := asksArr[i].([]interface{})
-		if !ok || len(entry) < 2 {
+		if raw.Topic == "" {
 			continue
 		}
 
-		price, _ := strconv.ParseFloat(entry[0].(string), 64)
-		qty, _ := strconv.ParseFloat(entry[1].(string), 64)
-
-		if price > 0 && qty > 0 {
-			asks = append(asks, feed.Level{
-				Price:  price,
-				Amount: qty,
-			})
+		ob := feed.OrderBook{
+			Time: time.Now().UnixMilli(),
 		}
+
+		// -------------------------
+		// BIDS
+		// -------------------------
+
+		for _, b := range raw.Data.Bids {
+
+			price := parseFloat(b[0])
+
+			qty := parseFloat(b[1])
+
+			ob.Bids = append(
+				ob.Bids,
+				feed.Level{
+					Price: price,
+					Qty:   qty,
+				},
+			)
+		}
+
+		// -------------------------
+		// ASKS
+		// -------------------------
+
+		for _, a := range raw.Data.Asks {
+
+			price := parseFloat(a[0])
+
+			qty := parseFloat(a[1])
+
+			ob.Asks = append(
+				ob.Asks,
+				feed.Level{
+					Price: price,
+					Qty:   qty,
+				},
+			)
+		}
+
+		symbol :=
+			strings.ToUpper(
+				raw.Data.Symbol,
+			)
+
+		feed.UpdateOrderBook(
+			"bybit",
+			symbol,
+			ob,
+		)
+	}
+}
+
+// -----------------------------------
+// CLOSE
+// -----------------------------------
+
+func (b *BybitWS) Close() error {
+
+	if b.conn != nil {
+
+		log.Println(
+			"[BYBIT WS] closed",
+		)
+
+		return b.conn.Close()
 	}
 
-	if len(bids) == 0 || len(asks) == 0 {
-		return
-	}
-
-	// ✅ THIS IS WHAT YOU WERE MISSING
-	feed.UpdateOrderBook("bybit", symbol, feed.OrderBook{
-		Bids: bids,
-		Asks: asks,
-		Time: time.Now().UnixMilli(),
-	})
-
-	log.Println("📥 OB UPDATE: bybit", symbol)
-
-	// (optional) still send price
-	select {
-	case f.Stream <- feed.Price{
-		Exchange: "bybit",
-		Symbol:   symbol,
-		Bid:      bids[0].Price,
-		Ask:      asks[0].Price,
-		Time:     time.Now().UnixMilli(),
-	}:
-	default:
-	}
+	return nil
 }

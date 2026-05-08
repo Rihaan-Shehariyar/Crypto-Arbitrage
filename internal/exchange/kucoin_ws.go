@@ -1,202 +1,261 @@
 package exchange
 
 import (
+	"bytes"
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-type KucoinWS struct{}
+type KucoinWS struct {
+	conn *websocket.Conn
 
-func (k KucoinWS) Start(f *feed.Feed, symbols []string) {
-	go func() {
-		for {
+	symbols []string
+}
 
-			// -------------------------
-			// 1. Get WebSocket token
-			// -------------------------
-			resp, err := http.Post("https://api.kucoin.com/api/v1/bullet-public", "application/json", nil)
-			if err != nil {
-				log.Println("[KUCOIN] token error:", err)
-				time.Sleep(3 * time.Second)
-				continue
-			}
+// -----------------------------------
+// NAME
+// -----------------------------------
 
-			var result struct {
-				Data struct {
-					Token           string `json:"token"`
-					InstanceServers []struct {
-						Endpoint     string `json:"endpoint"`
-						PingInterval int    `json:"pingInterval"`
-					} `json:"instanceServers"`
-				} `json:"data"`
-			}
+func (k *KucoinWS) Name() string {
+	return "KUCOIN"
+}
 
-			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-				log.Println("[KUCOIN] decode error:", err)
-				resp.Body.Close()
-				continue
-			}
-			resp.Body.Close()
+// -----------------------------------
+// CONNECT
+// -----------------------------------
 
-			if len(result.Data.InstanceServers) == 0 {
-				log.Println("[KUCOIN] no servers available")
-				time.Sleep(3 * time.Second)
-				continue
-			}
+func (k *KucoinWS) Connect(
+	symbols []string,
+) error {
 
-			endpoint := result.Data.InstanceServers[0].Endpoint
-			token := result.Data.Token
-			pingInterval := result.Data.InstanceServers[0].PingInterval
+	k.symbols = symbols
 
-			url := endpoint + "?token=" + token
+	// -------------------------
+	// GET WS TOKEN
+	// -------------------------
 
-			log.Println("[KUCOIN WS] connecting:", url)
+	reqBody := bytes.NewBuffer([]byte("{}"))
 
-			conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-			if err != nil {
-				log.Println("[KUCOIN WS] dial error:", err)
-				time.Sleep(3 * time.Second)
-				continue
-			}
+	req, err := http.NewRequest(
+		"POST",
+		"https://api.kucoin.com/api/v1/bullet-public",
+		reqBody,
+	)
 
-			log.Println("[KUCOIN WS] connected")
+	if err != nil {
+		return err
+	}
 
-			// -------------------------
-			// 2. Start Ping (CRITICAL)
-			// -------------------------
-			go func() {
-				ticker := time.NewTicker(time.Duration(pingInterval/2) * time.Millisecond)
-				defer ticker.Stop()
+	client := &http.Client{}
 
-				for range ticker.C {
-					err := conn.WriteJSON(map[string]interface{}{
-						"id":   time.Now().Unix(),
-						"type": "ping",
-					})
-					if err != nil {
-						log.Println("[KUCOIN PING ERROR]", err)
-						return
-					}
-				}
-			}()
+	resp, err := client.Do(req)
 
-			// -------------------------
-			// 3. Subscribe to symbols
-			// -------------------------
+	if err != nil {
+		return err
+	}
 
-			topics := strings.Join(symbols, ",") // BTC-USDT,ETH-USDT,SOL-USDT
+	defer resp.Body.Close()
 
-			sub := map[string]interface{}{
-				"id":             time.Now().Unix(),
-				"type":           "subscribe",
-				"topic":          "/market/ticker:" + topics,
-				"privateChannel": false,
-				"response":       true,
-			}
+	body, err := io.ReadAll(resp.Body)
 
-			err = conn.WriteJSON(sub)
-			if err != nil {
-				log.Println("[KUCOIN SUB ERROR]", err)
-			}
+	if err != nil {
+		return err
+	}
 
-			log.Println("[KUCOIN SUB]", sub["topic"])
+	var tokenResp struct {
+		Data struct {
+			Token string `json:"token"`
 
-			// -------------------------
-			// 4. Read messages loop
-			// -------------------------
-			for {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					log.Println("[KUCOIN WS] read error:", err)
-					conn.Close()
-					break
-				}
+			InstanceServers []struct {
+				Endpoint string `json:"endpoint"`
+			} `json:"instanceServers"`
+		} `json:"data"`
+	}
 
-				// log.Println("[KUCOIN RAW]", string(msg))
+	err = json.Unmarshal(
+		body,
+		&tokenResp,
+	)
 
-				var resp map[string]interface{}
-				if err := json.Unmarshal(msg, &resp); err != nil {
-					continue
-				}
+	if err != nil {
+		return err
+	}
 
-				// Only real ticker messages
-				msgType, _ := resp["type"].(string)
+	endpoint :=
+		tokenResp.Data.InstanceServers[0].Endpoint
 
-				if msgType == "pong" {
-					continue
-				}
+	token :=
+		tokenResp.Data.Token
 
-				if msgType != "message" {
-					continue
-				}
+	wsURL :=
+		endpoint + "?token=" + token
 
-				topic, _ := resp["topic"].(string)
-				if !strings.Contains(topic, "/market/ticker") {
-					continue
-				}
+	log.Println(
+		"[KUCOIN WS] connecting:",
+		wsURL,
+	)
 
-				data, ok := resp["data"].(map[string]interface{})
-				if !ok {
-					continue
-				}
+	conn, _, err := websocket.DefaultDialer.Dial(
+		wsURL,
+		nil,
+	)
 
-				parts := strings.Split(topic, ":")
-				if len(parts) < 2 {
-					continue
-				}
+	if err != nil {
+		return err
+	}
 
-				symbolRaw := parts[1] // BTC-USDT
-				symbol := strings.ReplaceAll(symbolRaw, "-", "")
+	k.conn = conn
 
-				// Normalize: BTC-USDT → BTCUSDT
+	log.Println(
+		"[KUCOIN WS] connected",
+	)
 
-				var bid, ask float64
+	return nil
+}
 
-				// --- BID ---
-				switch v := data["bestBid"].(type) {
-				case string:
-					bid, _ = strconv.ParseFloat(v, 64)
-				case float64:
-					bid = v
-				default:
-					continue
-				}
+// -----------------------------------
+// SUBSCRIBE
+// -----------------------------------
 
-				// --- ASK ---
-				switch v := data["bestAsk"].(type) {
-				case string:
-					ask, _ = strconv.ParseFloat(v, 64)
-				case float64:
-					ask = v
-				default:
-					continue
-				}
+func (k *KucoinWS) Subscribe() error {
 
-				if bid <= 0 || ask <= 0 {
-					continue
-				}
+	for _, s := range k.symbols {
 
-				// log.Printf(" KuCoin %s | Bid: %.2f Ask: %.2f", symbol, bid, ask)
+		topic :=
+			"/spotMarket/level2Depth5:" +
+				strings.ToUpper(s)
 
-				// Non-blocking send
-				select {
-				case f.Stream <- feed.Price{
-					Exchange: "kucoin",
-					Symbol:   symbol,
-					Bid:      bid,
-					Ask:      ask,
-					Time:     time.Now().UnixMilli(),
-				}:
-				default:
-				}
-			}
+		payload := map[string]interface{}{
+			"id":             time.Now().Unix(),
+			"type":           "subscribe",
+			"topic":          topic,
+			"response":       true,
+			"privateChannel": false,
 		}
-	}()
+
+		err := k.conn.WriteJSON(payload)
+
+		if err != nil {
+			return err
+		}
+
+		log.Printf(
+			"[KUCOIN WS] subscribed: %s",
+			topic,
+		)
+	}
+
+	return nil
+}
+
+// -----------------------------------
+// READ LOOP
+// -----------------------------------
+
+func (k *KucoinWS) ReadLoop() error {
+
+	for {
+
+		k.conn.SetReadDeadline(
+			time.Now().Add(
+				30 * time.Second,
+			),
+		)
+
+		_, msg, err := k.conn.ReadMessage()
+
+		if err != nil {
+			return err
+		}
+
+		var raw struct {
+			Topic string `json:"topic"`
+
+			Data struct {
+				Bids [][]string `json:"bids"`
+
+				Asks [][]string `json:"asks"`
+			} `json:"data"`
+		}
+
+		err = json.Unmarshal(
+			msg,
+			&raw,
+		)
+
+		if err != nil {
+			continue
+		}
+
+		if raw.Topic == "" {
+			continue
+		}
+
+		ob := feed.OrderBook{
+			Time: time.Now().UnixMilli(),
+		}
+
+		for _, b := range raw.Data.Bids {
+
+			ob.Bids = append(
+				ob.Bids,
+				feed.Level{
+					Price: parseFloat(b[0]),
+					Qty:   parseFloat(b[1]),
+				},
+			)
+		}
+
+		for _, a := range raw.Data.Asks {
+
+			ob.Asks = append(
+				ob.Asks,
+				feed.Level{
+					Price: parseFloat(a[0]),
+					Qty:   parseFloat(a[1]),
+				},
+			)
+		}
+
+		symbol :=
+			strings.Split(
+				raw.Topic,
+				":",
+			)
+
+		if len(symbol) < 2 {
+			continue
+		}
+
+		feed.UpdateOrderBook(
+			"kucoin",
+			symbol[1],
+			ob,
+		)
+	}
+}
+
+// -----------------------------------
+// CLOSE
+// -----------------------------------
+
+func (k *KucoinWS) Close() error {
+
+	if k.conn != nil {
+
+		log.Println(
+			"[KUCOIN WS] closed",
+		)
+
+		return k.conn.Close()
+	}
+
+	return nil
 }

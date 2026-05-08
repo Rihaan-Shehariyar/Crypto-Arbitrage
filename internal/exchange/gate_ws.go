@@ -4,137 +4,200 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-type GateWS struct{}
+type GateWS struct {
+	conn *websocket.Conn
 
-func (g GateWS) Start(f *feed.Feed, symbols []string) {
-	go func() {
+	symbols []string
+}
 
-		url := "wss://api.gateio.ws/ws/v4/"
-		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-		if err != nil {
-			log.Println("[GATE] connect error:", err)
-			return
-		}
-		log.Println("[GATE] connected")
+// -----------------------------------
+// NAME
+// -----------------------------------
 
-		// Gate uses format BTC_USDT
-		gateSymbols := []string{}
-		for _, s := range symbols {
-			gateSymbols = append(gateSymbols, toGateSymbol(s))
-		}
+func (g *GateWS) Name() string {
+	return "GATE"
+}
 
-		sub := map[string]interface{}{
+// -----------------------------------
+// CONNECT
+// -----------------------------------
+
+func (g *GateWS) Connect(
+	symbols []string,
+) error {
+
+	g.symbols = symbols
+
+	wsURL :=
+		"wss://api.gateio.ws/ws/v4/"
+
+	log.Println(
+		"[GATE WS] connecting:",
+		wsURL,
+	)
+
+	conn, _, err := websocket.DefaultDialer.Dial(
+		wsURL,
+		nil,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	g.conn = conn
+
+	log.Println(
+		"[GATE WS] connected",
+	)
+
+	return nil
+}
+
+// -----------------------------------
+// SUBSCRIBE
+// -----------------------------------
+
+func (g *GateWS) Subscribe() error {
+
+	for _, s := range g.symbols {
+
+		symbol :=
+			strings.ReplaceAll(
+				strings.ToUpper(s),
+				"USDT",
+				"_USDT",
+			)
+
+		payload := map[string]interface{}{
 			"time":    time.Now().Unix(),
 			"channel": "spot.order_book_update",
 			"event":   "subscribe",
-			"payload": []interface{}{
-				gateSymbols,
+			"payload": []string{
+				symbol,
 				"100ms",
 			},
 		}
 
-		conn.WriteJSON(sub)
+		err := g.conn.WriteJSON(payload)
 
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("[GATE] read error:", err)
-				return
-			}
-
-			var resp map[string]interface{}
-			if err := json.Unmarshal(msg, &resp); err != nil {
-				continue
-			}
-
-			if resp["channel"] != "spot.order_book_update" {
-				continue
-			}
-
-			result, ok := resp["result"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			sVal, ok := result["s"]
-			if !ok {
-				continue
-			}
-
-			sStr, ok := sVal.(string)
-			if !ok || sStr == "" {
-				continue
-			}
-
-			symbol := fromGateSymbol(sStr)
-			bRaw, ok1 := result["b"]
-			aRaw, ok2 := result["a"]
-
-			if !ok1 || !ok2 {
-				continue
-			}
-
-			bidsRaw, ok1 := bRaw.([]interface{})
-			asksRaw, ok2 := aRaw.([]interface{})
-
-			if !ok1 || !ok2 {
-				continue
-			}
-			if len(bidsRaw) == 0 || len(asksRaw) == 0 {
-				continue
-			}
-
-			var bids []feed.Level
-			var asks []feed.Level
-
-			for i := 0; i < len(bidsRaw) && i < 10; i++ {
-				entry := bidsRaw[i].([]interface{})
-				price, _ := strconv.ParseFloat(entry[0].(string), 64)
-				qty, _ := strconv.ParseFloat(entry[1].(string), 64)
-
-				if price > 0 && qty > 0 {
-					bids = append(bids, feed.Level{Price: price, Amount: qty})
-				}
-			}
-
-			for i := 0; i < len(asksRaw) && i < 10; i++ {
-				entry := asksRaw[i].([]interface{})
-				price, _ := strconv.ParseFloat(entry[0].(string), 64)
-				qty, _ := strconv.ParseFloat(entry[1].(string), 64)
-
-				if price > 0 && qty > 0 {
-					asks = append(asks, feed.Level{Price: price, Amount: qty})
-				}
-			}
-
-			if len(bids) == 0 || len(asks) == 0 {
-				continue
-			}
-
-			feed.UpdateOrderBook("gate", symbol, feed.OrderBook{
-				Bids: bids,
-				Asks: asks,
-				Time: time.Now().UnixMilli(),
-			})
-
-			log.Println("📥 OB UPDATE: gate", symbol)
+		if err != nil {
+			return err
 		}
-	}()
+
+		log.Printf(
+			"[GATE WS] subscribed: %s",
+			symbol,
+		)
+	}
+
+	return nil
 }
 
-func toGateSymbol(s string) string {
-	// BTCUSDT → BTC_USDT
-	return strings.Replace(s, "USDT", "_USDT", 1)
+// -----------------------------------
+// READ LOOP
+// -----------------------------------
+
+func (g *GateWS) ReadLoop() error {
+
+	for {
+
+		g.conn.SetReadDeadline(
+			time.Now().Add(
+				30 * time.Second,
+			),
+		)
+
+		_, msg, err := g.conn.ReadMessage()
+
+		if err != nil {
+			return err
+		}
+
+		var raw struct {
+			Result struct {
+				Symbol string `json:"s"`
+
+				Bids [][]string `json:"b"`
+
+				Asks [][]string `json:"a"`
+			} `json:"result"`
+		}
+
+		err = json.Unmarshal(
+			msg,
+			&raw,
+		)
+
+		if err != nil {
+			continue
+		}
+
+		if raw.Result.Symbol == "" {
+			continue
+		}
+
+		ob := feed.OrderBook{
+			Time: time.Now().UnixMilli(),
+		}
+
+		for _, b := range raw.Result.Bids {
+
+			ob.Bids = append(
+				ob.Bids,
+				feed.Level{
+					Price: parseFloat(b[0]),
+					Qty:   parseFloat(b[1]),
+				},
+			)
+		}
+
+		for _, a := range raw.Result.Asks {
+
+			ob.Asks = append(
+				ob.Asks,
+				feed.Level{
+					Price: parseFloat(a[0]),
+					Qty:   parseFloat(a[1]),
+				},
+			)
+		}
+
+		symbol :=
+			strings.ReplaceAll(
+				raw.Result.Symbol,
+				"_",
+				"",
+			)
+
+		feed.UpdateOrderBook(
+			"gate",
+			symbol,
+			ob,
+		)
+	}
 }
 
-func fromGateSymbol(s string) string {
-	// BTC_USDT → BTCUSDT
-	return strings.ReplaceAll(s, "_", "")
+// -----------------------------------
+// CLOSE
+// -----------------------------------
+
+func (g *GateWS) Close() error {
+
+	if g.conn != nil {
+
+		log.Println(
+			"[GATE WS] closed",
+		)
+
+		return g.conn.Close()
+	}
+
+	return nil
 }
