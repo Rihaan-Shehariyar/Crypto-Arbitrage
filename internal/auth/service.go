@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"crypto-arbitrage/internal/db"
 	"errors"
 
@@ -9,51 +8,81 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func Register(email, password string) error {
+func Register(
+	email string,
+	password string,
+) error {
 
-	var exists bool
+	var existing User
 
-	err := db.DB.QueryRow(context.Background(),
-		"SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)", email,
-	).Scan(&exists)
+	err := db.DB.
+		Where("email = ?", email).
+		First(&existing).Error
+
+	// user already exists
+	if err == nil {
+		return errors.New(
+			"user already exists",
+		)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
 
 	if err != nil {
 		return err
 	}
 
-	if exists {
-		return errors.New("user already exists")
+	user := User{
+
+		ID: uuid.NewString(),
+
+		Email: email,
+
+		Password: string(hash),
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-
-	id := uuid.NewString()
-
-	_, err = db.DB.Exec(context.Background(),
-		"INSERT INTO users (id, email, password) VALUES ($1, $2, $3)",
-		id, email, string(hash),
-	)
-
-	return err
+	return db.DB.Create(&user).Error
 }
 
-func Login(email, password string) (string, error) {
+func Login(
+	email string,
+	password string,
+) (string, error) {
 
 	var user User
 
-	err := db.DB.QueryRow(context.Background(),
-		"SELECT id, email, password FROM users WHERE email=$1",
-		email,
-	).Scan(&user.ID, &user.Email, &user.Password)
+	err := db.DB.
+		Where("email = ?", email).
+		First(&user).Error
 
 	if err != nil {
-		return "", errors.New("invalid credentials")
+
+		return "",
+			errors.New(
+				"invalid credentials",
+			)
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(user.Password),
+		[]byte(password),
+	)
+
 	if err != nil {
-		return "", errors.New("invalid credentials")
+
+		return "",
+			errors.New(
+				"invalid credentials",
+			)
 	}
 
-	return user.ID, nil 
+	token, err := GenerateToken(user.ID)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

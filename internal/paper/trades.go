@@ -1,6 +1,7 @@
 package paper
 
 import (
+	"crypto-arbitrage/internal/db"
 	"sync"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 )
 
 type Trade struct {
-	ID     string
+	ID     string `gorm:"primaryKey"`
 	Symbol string
 
 	BuyExchange  string
@@ -21,10 +22,11 @@ type Trade struct {
 
 	ProfitUSDT    float64
 	ProfitPercent float64
+	LatencyMs     int64
+	Time          time.Time
+	Status        string
 
-	Status string
-
-	Time time.Time
+	CreatedAt time.Time
 }
 
 var Trades []Trade
@@ -44,4 +46,16 @@ func AddTrade(t Trade) {
 	)
 
 	SaveTrade(t)
+}
+
+func (t *Trade) BeforeCreate(tx interface{}) error {
+	if t.ID == "" {
+		t.ID = uuid.NewString()
+	}
+
+	return nil
+}
+
+func UpdateTrade(t Trade) error {
+	return db.DB.Model(&Trade{}).Where("id=?").Updates(t).Error
 }

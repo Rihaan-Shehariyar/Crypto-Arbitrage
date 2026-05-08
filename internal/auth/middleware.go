@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"crypto-arbitrage/internal/db"
 	"net/http"
 
@@ -9,30 +8,67 @@ import (
 )
 
 func AuthMiddleware() gin.HandlerFunc {
+
 	return func(c *gin.Context) {
 
-		token := c.GetHeader("Authorization")
+		token := c.GetHeader(
+			"Authorization",
+		)
 
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
+
+			c.JSON(
+				http.StatusUnauthorized,
+				gin.H{
+					"error": "missing token",
+				},
+			)
+
 			c.Abort()
+
+			return
+		}
+
+		userID, err := ValidateToken(
+			token,
+		)
+
+		if err != nil {
+
+			c.JSON(
+				http.StatusUnauthorized,
+				gin.H{
+					"error": "invalid token",
+				},
+			)
+
+			c.Abort()
+
 			return
 		}
 
 		var user User
 
-		err := db.DB.QueryRow(context.Background(),
-			"SELECT id, email FROM users WHERE id=$1",
-			token,
-		).Scan(&user.ID, &user.Email)
+		err = db.DB.
+			Where("id = ?", userID).
+			First(&user).Error
 
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+
+			c.JSON(
+				http.StatusUnauthorized,
+				gin.H{
+					"error": "user not found",
+				},
+			)
+
 			c.Abort()
+
 			return
 		}
 
 		c.Set("user", user)
+
 		c.Next()
 	}
 }

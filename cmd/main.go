@@ -8,6 +8,8 @@ import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
+	"crypto-arbitrage/internal/paper"
+	"crypto-arbitrage/internal/recovery"
 	"crypto-arbitrage/internal/service"
 	"crypto-arbitrage/internal/websocket"
 	"log"
@@ -27,6 +29,11 @@ func main() {
 	godotenv.Load()
 
 	db.Connect()
+	recovery.RecoverTrades()
+	db.DB.AutoMigrate(
+		&paper.Trade{},
+		&auth.User{},
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -58,7 +65,7 @@ func main() {
 		"ETHUSDT",
 		"SOLUSDT",
 	})
- 
+
 	kucoinWS := exchange.KucoinWS{}
 	kucoinWS.Start(f, []string{
 		"BTC-USDT",

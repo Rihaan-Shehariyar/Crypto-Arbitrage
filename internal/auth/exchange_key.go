@@ -1,9 +1,18 @@
 package auth
 
+import "time"
+
 type ExchangeKey struct {
-	ID        string
-	UserID    string
-	Exchange  string
+	ID string `gorm:"primaryKey"`
+
+	UserID string `gorm:"index"`
+
+	Exchange string
+
 	APIKey    string
 	APISecret string
+
+   
+
+	CreatedAt time.Time
 }

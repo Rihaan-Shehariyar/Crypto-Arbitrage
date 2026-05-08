@@ -1,13 +1,10 @@
 package auth
 
 import (
-	"context"
 	"crypto-arbitrage/internal/db"
 
 	"github.com/google/uuid"
 )
-
-// SAVE EXCHANGE KEY
 
 func SaveExchangeKey(
 	userID,
@@ -16,83 +13,54 @@ func SaveExchangeKey(
 	apiSecret string,
 ) error {
 
-	id := uuid.NewString()
+	var existing ExchangeKey
 
-	_, err := db.DB.Exec(
-		context.Background(),
-		`
-	INSERT INTO exchange_keys
-	(
-		id,
-		user_id,
-		exchange,
-		api_key,
-		api_secret
-	)
-	VALUES ($1, $2, $3, $4, $5)
+	err := db.DB.
+		Where(
+			"user_id = ? AND exchange = ?",
+			userID,
+			exchange,
+		).
+		First(&existing).Error
 
-	ON CONFLICT (user_id, exchange)
+	// update existing
+	if err == nil {
 
-	DO UPDATE SET
-		api_key = EXCLUDED.api_key,
-		api_secret = EXCLUDED.api_secret
-	`,
-		id,
-		userID,
-		exchange,
-		apiKey,
-		apiSecret,
-	)
+		existing.APIKey = apiKey
+		existing.APISecret = apiSecret
 
-	return err
+		return db.DB.Save(&existing).Error
+	}
+
+	// create new
+	key := ExchangeKey{
+
+		ID: uuid.NewString(),
+
+		UserID: userID,
+
+		Exchange: exchange,
+
+		APIKey:    apiKey,
+		APISecret: apiSecret,
+	}
+
+	return db.DB.Create(&key).Error
 }
 
 // GET USER KEYS
-
 func GetUserKeys(
 	userID string,
 ) ([]ExchangeKey, error) {
 
-	rows, err := db.DB.Query(
-		context.Background(),
-		`
-		SELECT
-			id,
-			exchange,
-			api_key,
-			api_secret
-		FROM exchange_keys
-		WHERE user_id=$1
-		`,
-		userID,
-	)
+	var keys []ExchangeKey
+
+	err := db.DB.
+		Where("user_id = ?", userID).
+		Find(&keys).Error
 
 	if err != nil {
 		return nil, err
-	}
-
-	defer rows.Close()
-
-	var keys []ExchangeKey
-
-	for rows.Next() {
-
-		var k ExchangeKey
-
-		err := rows.Scan(
-			&k.ID,
-			&k.Exchange,
-			&k.APIKey,
-			&k.APISecret,
-		)
-
-		if err != nil {
-			continue
-		}
-
-		k.UserID = userID
-
-		keys = append(keys, k)
 	}
 
 	return keys, nil
