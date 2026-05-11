@@ -11,6 +11,7 @@ import (
 type Trade struct {
 	ID     string `gorm:"primaryKey"`
 	Symbol string
+	UserID string
 
 	BuyExchange  string
 	SellExchange string

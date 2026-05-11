@@ -86,3 +86,14 @@ func Login(
 
 	return token, nil
 }
+
+func GetAllUsers() ([]User, error) {
+
+	var users []User
+
+	err := db.DB.Find(
+		&users,
+	).Error
+
+	return users, err
+}

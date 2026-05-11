@@ -1,100 +1,100 @@
 package service
 
-import (
-	"crypto-arbitrage/internal/feed"
-	"strings"
-	"sync"
-	"time"
-)
+// import (
+// 	"crypto-arbitrage/internal/feed"
+// 	"strings"
+// 	"sync"
+// 	"time"
+// )
 
-// 🔒 thread-safe storage
-var (
-	priceBook = make(map[string]map[string]feed.Price)
-	mu        sync.RWMutex
-)
+// // 🔒 thread-safe storage
+// var (
+// 	priceBook = make(map[string]map[string]feed.Price)
+// 	mu        sync.RWMutex
+// )
 
-// -------------------------
-// UPDATE PRICE
-// -------------------------
+// // -------------------------
+// // UPDATE PRICE
+// // -------------------------
 
-func UpdatePrice(p feed.Price) {
+// func UpdatePrice(p feed.Price) {
 
-	symbol := strings.ToUpper(p.Symbol)
+// 	symbol := strings.ToUpper(p.Symbol)
 
-	mu.Lock()
-	defer mu.Unlock()
+// 	mu.Lock()
+// 	defer mu.Unlock()
 
-	if _, ok := priceBook[symbol]; !ok {
-		priceBook[symbol] = make(map[string]feed.Price)
-	}
+// 	if _, ok := priceBook[symbol]; !ok {
+// 		priceBook[symbol] = make(map[string]feed.Price)
+// 	}
 
-	priceBook[symbol][p.Exchange] = p
-}
+// 	priceBook[symbol][p.Exchange] = p
+// }
 
-// -------------------------
-// GET ALL PRICES
-// -------------------------
+// // -------------------------
+// // GET ALL PRICES
+// // -------------------------
 
-func GetPrices(symbol string) []feed.Price {
+// func GetPrices(symbol string) []feed.Price {
 
-	symbol = strings.ToUpper(symbol)
+// 	symbol = strings.ToUpper(symbol)
 
-	mu.RLock()
-	defer mu.RUnlock()
+// 	mu.RLock()
+// 	defer mu.RUnlock()
 
-	var result []feed.Price
+// 	var result []feed.Price
 
-	for _, p := range priceBook[symbol] {
+// 	for _, p := range priceBook[symbol] {
 
-		// 🔥 filter stale data (>2s old)
-		if time.Now().UnixMilli()-p.Time > 2000 {
-			continue
-		}
+// 		// 🔥 filter stale data (>2s old)
+// 		if time.Now().UnixMilli()-p.Time > 2000 {
+// 			continue
+// 		}
 
-		result = append(result, p)
-	}
+// 		result = append(result, p)
+// 	}
 
-	return result
-}
+// 	return result
+// }
 
-// -------------------------
-// BEST BUY (LOWEST ASK)
-// -------------------------
+// // -------------------------
+// // BEST BUY (LOWEST ASK)
+// // -------------------------
 
-func GetBestBuy(symbol string) *feed.Price {
+// func GetBestBuy(symbol string) *feed.Price {
 
-	prices := GetPrices(symbol)
+// 	prices := GetPrices(symbol)
 
-	var best *feed.Price
+// 	var best *feed.Price
 
-	for i := range prices {
-		p := &prices[i]
+// 	for i := range prices {
+// 		p := &prices[i]
 
-		if best == nil || p.Ask < best.Ask {
-			best = p
-		}
-	}
+// 		if best == nil || p.Ask < best.Ask {
+// 			best = p
+// 		}
+// 	}
 
-	return best
-}
+// 	return best
+// }
 
-// -------------------------
-// BEST SELL (HIGHEST BID)
-// -------------------------
+// // -------------------------
+// // BEST SELL (HIGHEST BID)
+// // -------------------------
 
-func GetBestSell(symbol string) *feed.Price {
+// func GetBestSell(symbol string) *feed.Price {
 
-	prices := GetPrices(symbol)
+// 	prices := GetPrices(symbol)
 
-	var best *feed.Price
+// 	var best *feed.Price
 
-	for i := range prices {
-		p := &prices[i]
+// 	for i := range prices {
+// 		p := &prices[i]
 
-		if best == nil || p.Bid > best.Bid {
-			best = p
-		}
-	}
+// 		if best == nil || p.Bid > best.Bid {
+// 			best = p
+// 		}
+// 	}
 
-	return best
-}
+// 	return best
+// }

@@ -26,135 +26,230 @@ import (
 
 func main() {
 
+	// -----------------------------------
+	// ENV
+	// -----------------------------------
+
 	godotenv.Load()
 
+	// -----------------------------------
+	// DATABASE
+	// -----------------------------------
+
 	db.Connect()
-	recovery.RecoverTrades()
+
 	db.DB.AutoMigrate(
 		&paper.Trade{},
 		&auth.User{},
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// -----------------------------------
+	// RECOVERY
+	// -----------------------------------
+
+	recovery.RecoverTrades()
+
+	// -----------------------------------
+	// CONTEXT
+	// -----------------------------------
+
+	ctx, cancel :=
+		context.WithCancel(
+			context.Background(),
+		)
+
 	defer cancel()
 
-	//  CONFIG
+	// -----------------------------------
+	// ENGINE CONFIG
+	// -----------------------------------
 
-	service.CurrentMode = service.Cross
+	service.CurrentMode =
+		service.Cross
+
 	service.Simulate = true
 
-	log.Println("Mode:", service.CurrentMode)
-	log.Println("Simulation:", service.Simulate)
+	log.Println(
+		"Mode:",
+		service.CurrentMode,
+	)
 
-	//  FEED
+	log.Println(
+		"Simulation:",
+		service.Simulate,
+	)
+
+	// -----------------------------------
+	// FEED
+	// -----------------------------------
 
 	f := feed.NewFeed()
 
-	binance := &exchange.BinanceWS{}
+	_ = f
 
-	exchange.RunExchange(
-		binance,
-		[]string{
-			"BTCUSDT",
-			"ETHUSDT",
-			"SOLUSDT",
-		},
-	)
+	// -----------------------------------
+	// EXCHANGES
+	// -----------------------------------
 
-	bybit := &exchange.BybitWS{}
-
-	exchange.RunExchange(
-		bybit,
-		[]string{
-			"BTCUSDT",
-			"ETHUSDT",
-			"SOLUSDT",
-		},
-	)
-
-	kucoin := &exchange.KucoinWS{}
-
-	exchange.RunExchange(
-		kucoin,
-		[]string{
-			"BTCUSDT",
-			"ETHUSDT",
-			"SOLUSDT",
-		},
-	)
-
-	gate := &exchange.GateWS{}
-
-	exchange.RunExchange(
-		gate,
-		[]string{
-			"BTCUSDT",
-			"ETHUSDT",
-			"SOLUSDT",
-		},
-	)
-
-	okx := &exchange.OKXWS{}
-
-	exchange.RunExchange(
-		okx,
-		[]string{
-			"BTCUSDT",
-			"ETHUSDT",
-			"SOLUSDT",
-		},
-	)
-
-	// BROKER
-
-	binanceBroker := broker.NewBinance(
-		os.Getenv("BINANCE_KEY"),
-		os.Getenv("BINANCE_SECRET"),
-	)
-
-	brokers := map[string]broker.Broker{
-		"binance": binanceBroker,
+	symbols := []string{
+		"BTCUSDT",
+		"ETHUSDT",
+		"SOLUSDT",
 	}
 
-	log.Println("Brokers initialized")
+	exchange.RunExchange(
+		&exchange.BinanceWS{},
+		symbols,
+	)
 
+	exchange.RunExchange(
+		&exchange.BybitWS{},
+		symbols,
+	)
+
+	exchange.RunExchange(
+		&exchange.KucoinWS{},
+		symbols,
+	)
+
+	exchange.RunExchange(
+		&exchange.GateWS{},
+		symbols,
+	)
+
+	exchange.RunExchange(
+		&exchange.OKXWS{},
+		symbols,
+	)
+
+	// -----------------------------------
+	// BROKERS
+	// -----------------------------------
+
+	binanceBroker :=
+		broker.NewBinance(
+			os.Getenv("BINANCE_KEY"),
+			os.Getenv("BINANCE_SECRET"),
+		)
+
+	brokers :=
+		map[string]broker.Broker{
+
+			"binance": binanceBroker,
+		}
+
+	service.SetBrokers(
+		brokers,
+	)
+
+	log.Println(
+		"Brokers initialized",
+	)
+
+	// -----------------------------------
 	// TRIANGLES
+	// -----------------------------------
 
-	symbols, err := service.FetchBinanceSymbols()
+	allSymbols, err :=
+		service.FetchBinanceSymbols()
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	service.InitTriangles(symbols)
-	log.Println("Triangles initialized")
+	service.InitTriangles(
+		allSymbols,
+	)
 
-	//  WAIT FOR DATA
+	log.Println(
+		"Triangles initialized",
+	)
 
-	log.Println("Waiting for market data...")
-	time.Sleep(2 * time.Second)
+	// -----------------------------------
+	// WAIT FOR MARKET DATA
+	// -----------------------------------
 
-	// ENGINE
-	service.StartEventConsumer()
-	service.SetBrokers(brokers)
-	go service.StartBalanceWorker(brokers)
-	go service.StartEngine(ctx, f, brokers)
+	log.Println(
+		"Waiting for market data...",
+	)
 
+	time.Sleep(
+		2 * time.Second,
+	)
+
+	// -----------------------------------
+	// EVENT CONSUMER
+	// -----------------------------------
+
+	service.StartEventConsumer(ctx)
+
+	// -----------------------------------
+	// BALANCE WORKER
+	// -----------------------------------
+
+	go service.StartBalanceWorker(
+		brokers,
+	)
+
+	// -----------------------------------
 	// API
+	// -----------------------------------
 
 	r := gin.Default()
-	r.Use(cors.Default())
 
-	r.GET("/ws", handler.HandleWebSocket)
-	r.POST("/register", handler.RegisterHandler)
-	r.POST("/login", handler.LoginHandler)
+	r.Use(
+		cors.Default(),
+	)
 
-	// Protected routes
+	// PUBLIC
+
+	r.GET(
+		"/ws",
+		handler.HandleWebSocket,
+	)
+
+	r.POST(
+		"/register",
+		handler.RegisterHandler,
+	)
+
+	r.POST(
+		"/login",
+		handler.LoginHandler,
+	)
+
+	// -----------------------------------
+	// AUTH ROUTES
+	// -----------------------------------
+
 	authGroup := r.Group("/")
-	authGroup.Use(auth.AuthMiddleware())
 
-	authGroup.GET("/balance", handler.GetBalanceHandler(brokers))
-	authGroup.GET("/paper/balance", handler.GetPaperBalance)
-	authGroup.GET("/trades", handler.GetTrades)
+	authGroup.Use(
+		auth.AuthMiddleware(),
+	)
+
+	authGroup.GET(
+		"/balance",
+		handler.GetBalanceHandler(
+			brokers,
+		),
+	)
+
+	authGroup.GET(
+		"/paper/balance",
+		handler.GetPaperBalance,
+	)
+
+	authGroup.GET(
+		"/trades",
+		handler.GetTrades,
+	)
+
+	authGroup.GET(
+		"/user/metrics",
+		handler.UserMetricsHandler,
+	)
+
 	authGroup.POST(
 		"/exchange-keys",
 		handler.SaveExchangeKeyHandler,
@@ -165,33 +260,75 @@ func main() {
 		handler.GetExchangeKeysHandler,
 	)
 
+	// -----------------------------------
+	// ADMIN ROUTES
+	// -----------------------------------
+
+	r.GET(
+		"/admin/metrics",
+		handler.AdminMetricsHandler,
+	)
+
+	// -----------------------------------
+	// SERVER
+	// -----------------------------------
+
 	srv := &http.Server{
-		Addr:    ":8080",
+
+		Addr: ":8080",
+
 		Handler: r,
 	}
 
 	go func() {
-		log.Println("Server running on :8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+
+		log.Println(
+			"Server running on :8080",
+		)
+
+		if err := srv.ListenAndServe(); err != nil &&
+			err != http.ErrServerClosed {
+
 			log.Fatal(err)
 		}
 	}()
 
-	//  SHUTDOWN
+	// -----------------------------------
+	// SHUTDOWN
+	// -----------------------------------
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	quit :=
+		make(chan os.Signal, 1)
+
+	signal.Notify(
+		quit,
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
 
 	<-quit
-	log.Println("Shutdown signal received")
+
+	log.Println(
+		"Shutdown signal received",
+	)
 
 	cancel()
 
-	ctxTimeout, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxTimeout, cancelTimeout :=
+		context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+
 	defer cancelTimeout()
 
-	srv.Shutdown(ctxTimeout)
+	srv.Shutdown(
+		ctxTimeout,
+	)
 
 	websocket.CloseAll()
-	log.Println("Server exited")
+
+	log.Println(
+		"Server exited",
+	)
 }

@@ -3,8 +3,13 @@ package service
 import (
 	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/inventory"
+	"crypto-arbitrage/internal/journal"
+	"crypto-arbitrage/internal/metrics"
 	"crypto-arbitrage/internal/paper"
+	"crypto-arbitrage/internal/risk"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,19 +18,32 @@ import (
 
 var tradeLock sync.Map
 
-func lock(symbol string) bool {
+func lock(
+	userID string,
+	symbol string,
+) bool {
 
-	_, loaded := tradeLock.LoadOrStore(
-		symbol,
-		true,
-	)
+	key :=
+		userID + ":" + symbol
+
+	_, loaded :=
+		tradeLock.LoadOrStore(
+			key,
+			true,
+		)
 
 	return !loaded
 }
 
-func unlock(symbol string) {
+func unlock(
+	userID string,
+	symbol string,
+) {
 
-	tradeLock.Delete(symbol)
+	key :=
+		userID + ":" + symbol
+
+	tradeLock.Delete(key)
 }
 
 const (
@@ -33,14 +51,17 @@ const (
 	slippageBuffer = 0.05  // %
 	latencyBuffer  = 0.05  // %
 
-	minTradeValue = 10.0 // minimum USDT trade
+	minTradeValue = 10.0
 
-	maxCapital = 50.0 // paper capital
+	maxCapital = 50.0
 )
 
 var opportunityCount int
 
-func handleCross(symbol string) {
+func handleCross(
+	userID string,
+	symbol string,
+) {
 
 	orderBooks := feed.GetOrderBooks(
 		symbol,
@@ -58,27 +79,29 @@ func handleCross(symbol string) {
 
 		for sellEx, sellOB := range orderBooks {
 
-			// -------------------------
+			// -----------------------------------
 			// SAME EXCHANGE
-			// -------------------------
+			// -----------------------------------
 
 			if buyEx == sellEx {
 				continue
 			}
 
-			// -------------------------
+			// -----------------------------------
 			// STALE DATA
-			// -------------------------
+			// -----------------------------------
 
 			if now-buyOB.Time > 1000 ||
 				now-sellOB.Time > 1000 {
 
+				metrics.IncStaleBooks()
+
 				continue
 			}
 
-			// -------------------------
-			// EMPTY BOOK
-			// -------------------------
+			// -----------------------------------
+			// EMPTY ORDERBOOK
+			// -----------------------------------
 
 			if len(buyOB.Asks) == 0 ||
 				len(sellOB.Bids) == 0 {
@@ -86,9 +109,9 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
+			// -----------------------------------
 			// DEPTH-AWARE BUY
-			// -------------------------
+			// -----------------------------------
 
 			avgBuy, qty := simulateBuy(
 				buyOB.Asks,
@@ -105,9 +128,9 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
+			// -----------------------------------
 			// DEPTH-AWARE SELL
-			// -------------------------
+			// -----------------------------------
 
 			avgSell := simulateSell(
 				sellOB.Bids,
@@ -118,9 +141,9 @@ func handleCross(symbol string) {
 				continue
 			}
 
-			// -------------------------
+			// -----------------------------------
 			// SPREAD
-			// -------------------------
+			// -----------------------------------
 
 			rawSpread :=
 				((avgSell - avgBuy) / avgBuy) * 100
@@ -143,13 +166,144 @@ func handleCross(symbol string) {
 				netSpread,
 			)
 
-			// -------------------------
+			// -----------------------------------
 			// PROFITABLE?
-			// -------------------------
+			// -----------------------------------
 
 			if netSpread <= 0 {
 				continue
 			}
+
+			// -----------------------------------
+			// USER METRICS
+			// -----------------------------------
+
+			userMetrics := metrics.GetUserMetrics(
+				userID,
+			)
+
+			userMetrics.TotalOpportunities++
+
+			// -----------------------------------
+			// RISK VALIDATION
+			// -----------------------------------
+
+			err := risk.ValidateTrade(
+
+				risk.TradeRequest{
+
+					Symbol: symbol,
+
+					BuyExchange:  buyEx,
+					SellExchange: sellEx,
+
+					BuyPrice:  avgBuy,
+					SellPrice: avgSell,
+
+					Quantity: qty,
+
+					Spread: netSpread,
+
+					Capital: tradeValue,
+				},
+			)
+
+			if err != nil {
+
+				log.Printf(
+					"[RISK BLOCKED] %v",
+					err,
+				)
+
+				continue
+			}
+
+			// -----------------------------------
+			// INVENTORY CHECK
+			// -----------------------------------
+
+			baseAsset :=
+				strings.TrimSuffix(
+					symbol,
+					"USDT",
+				)
+
+			if !inventory.HasInventory(
+
+				buyEx,
+				sellEx,
+
+				baseAsset,
+
+				tradeValue,
+				qty,
+			) {
+
+				log.Printf(
+					"[INVENTORY BLOCKED] %s",
+					symbol,
+				)
+
+				continue
+			}
+
+			// -----------------------------------
+			// LOCK SYMBOL
+			// -----------------------------------
+
+			if !lock(
+				userID,
+				symbol,
+			) {
+				continue
+			}
+
+			opportunityCount++
+
+			tradeID := uuid.NewString()
+
+			// -----------------------------------
+			// CREATE TRADE
+			// -----------------------------------
+
+			trade := paper.Trade{
+
+				ID: tradeID,
+
+				UserID: userID,
+
+				Symbol: symbol,
+
+				BuyExchange:  buyEx,
+				SellExchange: sellEx,
+
+				BuyPrice:  avgBuy,
+				SellPrice: avgSell,
+
+				Quantity: qty,
+
+				Status: paper.StatusPending,
+
+				Time: time.Now(),
+			}
+
+			paper.AddTrade(trade)
+
+			userMetrics.TotalTrades++
+
+			// -----------------------------------
+			// JOURNAL
+			// -----------------------------------
+
+			journal.Add(
+				trade.ID,
+				"OPPORTUNITY",
+				"arbitrage opportunity detected",
+			)
+
+			// -----------------------------------
+			// PUBLISH EVENT
+			// -----------------------------------
 
 			events.Bus <- events.Event{
 
@@ -172,42 +326,6 @@ func handleCross(symbol string) {
 					Time: time.Now().UnixMilli(),
 				},
 			}
-			// -------------------------
-			// LOCK SYMBOL
-			// -------------------------
-
-			if !lock(symbol) {
-				continue
-			}
-
-			opportunityCount++
-
-			tradeID := uuid.NewString()
-
-			// -------------------------
-			// CREATE TRADE
-			// -------------------------
-
-			trade := paper.Trade{
-
-				ID: tradeID,
-
-				Symbol: symbol,
-
-				BuyExchange:  buyEx,
-				SellExchange: sellEx,
-
-				BuyPrice:  avgBuy,
-				SellPrice: avgSell,
-
-				Quantity: qty,
-
-				Status: paper.StatusPending,
-
-				Time: time.Now(),
-			}
-
-			paper.AddTrade(trade)
 
 			log.Printf(
 				"[TRADE:%s] 🔥 OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
@@ -219,11 +337,12 @@ func handleCross(symbol string) {
 				netSpread,
 			)
 
-			// -------------------------
-			// PAPER EXECUTION
-			// -------------------------
+			// -----------------------------------
+			// EXECUTION
+			// -----------------------------------
 
 			go func(
+				userID string,
 				trade paper.Trade,
 				symbol string,
 				buyEx string,
@@ -231,10 +350,14 @@ func handleCross(symbol string) {
 				avgBuy float64,
 				avgSell float64,
 				qty float64,
+				tradeValue float64,
+				baseAsset string,
 			) {
 
-				defer unlock(symbol)
-
+				defer unlock(
+					userID,
+					symbol,
+				)
 				start := time.Now()
 
 				log.Printf(
@@ -245,17 +368,40 @@ func handleCross(symbol string) {
 					sellEx,
 				)
 
-				// -------------------------
+				// -----------------------------------
 				// BUYING
-				// -------------------------
+				// -----------------------------------
 
-				trade.Status = paper.StatusBuying
+				trade.Status =
+					paper.StatusBuying
 
 				paper.UpdateTrade(trade)
 
-				// -------------------------
+				journal.Add(
+					trade.ID,
+					"BUYING",
+					"paper buy started",
+				)
+
+				// -----------------------------------
+				// INVENTORY UPDATE (BUY)
+				// -----------------------------------
+
+				inventory.SubInventory(
+					buyEx,
+					"USDT",
+					tradeValue,
+				)
+
+				inventory.AddInventory(
+					buyEx,
+					baseAsset,
+					qty,
+				)
+
+				// -----------------------------------
 				// PAPER BUY
-				// -------------------------
+				// -----------------------------------
 
 				paper.Buy(
 					symbol,
@@ -263,39 +409,68 @@ func handleCross(symbol string) {
 					maxCapital,
 				)
 
-				// -------------------------
+				// -----------------------------------
 				// BUY FILLED
-				// -------------------------
+				// -----------------------------------
 
-				trade.Status = paper.StatusBuyFilled
+				trade.Status =
+					paper.StatusBuyFilled
 
 				paper.UpdateTrade(trade)
 
-				// simulate latency
+				journal.Add(
+					trade.ID,
+					"BUY_FILLED",
+					"buy completed",
+				)
+
 				time.Sleep(
 					500 * time.Millisecond,
 				)
 
-				// -------------------------
+				// -----------------------------------
 				// SELLING
-				// -------------------------
+				// -----------------------------------
 
-				trade.Status = paper.StatusSelling
+				trade.Status =
+					paper.StatusSelling
 
 				paper.UpdateTrade(trade)
 
-				// -------------------------
+				journal.Add(
+					trade.ID,
+					"SELLING",
+					"paper sell started",
+				)
+
+				// -----------------------------------
+				// INVENTORY UPDATE (SELL)
+				// -----------------------------------
+
+				inventory.SubInventory(
+					sellEx,
+					baseAsset,
+					qty,
+				)
+
+				inventory.AddInventory(
+					sellEx,
+					"USDT",
+					qty*avgSell,
+				)
+
+				// -----------------------------------
 				// PAPER SELL
-				// -------------------------
+				// -----------------------------------
 
 				paper.Sell(
 					symbol,
 					avgSell,
 				)
 
-				// -------------------------
+				// -----------------------------------
 				// PROFIT
-				// -------------------------
+				// -----------------------------------
 
 				profitUSDT :=
 					(avgSell - avgBuy) * qty
@@ -306,9 +481,9 @@ func handleCross(symbol string) {
 				duration :=
 					time.Since(start)
 
-				// -------------------------
+				// -----------------------------------
 				// CLOSED
-				// -------------------------
+				// -----------------------------------
 
 				trade.ProfitUSDT =
 					profitUSDT
@@ -324,9 +499,16 @@ func handleCross(symbol string) {
 
 				paper.UpdateTrade(trade)
 
-				// -------------------------
-				// FINAL LOG
-				// -------------------------
+				journal.Add(
+					trade.ID,
+					"CLOSED",
+					"trade closed successfully",
+				)
+
+				userMetrics.ClosedTrades++
+
+				userMetrics.ProfitUSDT +=
+					profitUSDT
 
 				log.Printf(
 					"[TRADE:%s] ✅ CLOSED | %s | PnL %.4f USDT (%.4f%%) | %d ms",
@@ -337,7 +519,7 @@ func handleCross(symbol string) {
 					duration.Milliseconds(),
 				)
 
-			}(
+			}(userID,
 				trade,
 				symbol,
 				buyEx,
@@ -345,6 +527,8 @@ func handleCross(symbol string) {
 				avgBuy,
 				avgSell,
 				qty,
+				tradeValue,
+				baseAsset,
 			)
 		}
 	}
