@@ -4,10 +4,14 @@ import "sync"
 
 var invMu sync.RWMutex
 
-// exchange -> asset -> amount
-inventory[userID][exchange][asset]
 // -----------------------------------
-// FULL BALANCE UPDATE
+// exchange -> asset -> amount
+// -----------------------------------
+
+var inventory = make(map[string]map[string]float64)
+
+// -----------------------------------
+// FULL INVENTORY UPDATE
 // -----------------------------------
 
 func UpdateInventory(
@@ -22,7 +26,7 @@ func UpdateInventory(
 }
 
 // -----------------------------------
-// GET BALANCE
+// GET INVENTORY
 // -----------------------------------
 
 func GetInventory(
@@ -41,7 +45,7 @@ func GetInventory(
 }
 
 // -----------------------------------
-// ADD BALANCE
+// ADD INVENTORY
 // -----------------------------------
 
 func AddInventory(
@@ -63,7 +67,7 @@ func AddInventory(
 }
 
 // -----------------------------------
-// SUBTRACT BALANCE
+// SUB INVENTORY
 // -----------------------------------
 
 func SubInventory(
