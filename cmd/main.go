@@ -134,6 +134,7 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// ENGINE
+	service.StartEventConsumer()
 	service.SetBrokers(brokers)
 	go service.StartBalanceWorker(brokers)
 	go service.StartEngine(ctx, f, brokers)
@@ -168,7 +169,6 @@ func main() {
 		Addr:    ":8080",
 		Handler: r,
 	}
-          
 
 	go func() {
 		log.Println("Server running on :8080")

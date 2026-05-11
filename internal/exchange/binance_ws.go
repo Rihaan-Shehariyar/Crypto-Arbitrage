@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"fmt"
@@ -180,6 +181,20 @@ func (b *BinanceWS) ReadLoop() error {
 			symbol,
 			ob,
 		)
+
+		events.Bus <- events.Event{
+
+			Type: "ORDERBOOK",
+
+			Data: events.OrderBookEvent{
+
+				Exchange: "binance",
+
+				Symbol: symbol,
+
+				OrderBook: ob,
+			},
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"log"
@@ -248,6 +249,20 @@ func (o *OKXWS) ReadLoop() error {
 			symbol,
 			ob,
 		)
+
+		events.Bus <- events.Event{
+
+			Type: "ORDERBOOK",
+
+			Data: events.OrderBookEvent{
+
+				Exchange: "okx",
+
+				Symbol: symbol,
+
+				OrderBook: ob,
+			},
+		}
 	}
 }
 

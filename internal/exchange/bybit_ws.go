@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"log"
@@ -192,6 +193,20 @@ func (b *BybitWS) ReadLoop() error {
 			symbol,
 			ob,
 		)
+
+		events.Bus <- events.Event{
+
+			Type: "ORDERBOOK",
+
+			Data: events.OrderBookEvent{
+
+				Exchange: "bybit",
+
+				Symbol: symbol,
+
+				OrderBook: ob,
+			},
+		}
 	}
 }
 

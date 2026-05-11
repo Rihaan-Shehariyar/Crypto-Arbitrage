@@ -52,4 +52,5 @@ func GetTotalPnL() float64 {
 		total += t.Profit
 	}
 	return total
+
 }

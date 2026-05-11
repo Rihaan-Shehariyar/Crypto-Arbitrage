@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/paper"
 	"log"
@@ -150,6 +151,27 @@ func handleCross(symbol string) {
 				continue
 			}
 
+			events.Bus <- events.Event{
+
+				Type: "OPPORTUNITY",
+
+				Data: events.OpportunityEvent{
+
+					Symbol: symbol,
+
+					BuyExchange:  buyEx,
+					SellExchange: sellEx,
+
+					BuyPrice:  avgBuy,
+					SellPrice: avgSell,
+
+					Spread: netSpread,
+
+					ProfitUSDT: (avgSell - avgBuy) * qty,
+
+					Time: time.Now().UnixMilli(),
+				},
+			}
 			// -------------------------
 			// LOCK SYMBOL
 			// -------------------------

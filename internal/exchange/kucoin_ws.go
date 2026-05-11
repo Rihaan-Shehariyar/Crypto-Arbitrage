@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"bytes"
+	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
 	"encoding/json"
 	"io"
@@ -239,6 +240,20 @@ func (k *KucoinWS) ReadLoop() error {
 			symbol[1],
 			ob,
 		)
+
+		events.Bus <- events.Event{
+
+			Type: "ORDERBOOK",
+
+			Data: events.OrderBookEvent{
+
+				Exchange: "kucoin",
+
+				Symbol: symbol[1],
+
+				OrderBook: ob,
+			},
+		}
 	}
 }
 
