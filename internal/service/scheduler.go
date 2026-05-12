@@ -7,7 +7,8 @@ import (
 
 var schedMu sync.Mutex
 
-var lastScheduled = make(map[string]int64)
+var lastScheduled =
+	make(map[string]int64)
 
 const minScheduleGapMs = 200
 

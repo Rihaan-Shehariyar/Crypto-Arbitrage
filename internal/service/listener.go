@@ -42,13 +42,19 @@ func StartEventConsumer(
 				switch event.Type {
 
 				// -----------------------------------
-				// ORDERBOOK EVENT
+				// ORDERBOOK
 				// -----------------------------------
 
 				case "ORDERBOOK":
 
 					ob :=
 						event.Data.(events.OrderBookEvent)
+
+					log.Printf(
+						"[EVENT] ORDERBOOK %s %s",
+						ob.Exchange,
+						ob.Symbol,
+					)
 
 					// -----------------------------------
 					// LOAD USERS
@@ -60,25 +66,51 @@ func StartEventConsumer(
 					if err != nil {
 
 						log.Println(
-							"[EVENT] failed to load users:",
+							"[EVENT] failed loading users:",
 							err,
 						)
 
 						continue
 					}
 
+					log.Printf(
+						"[EVENT] users loaded: %d",
+						len(users),
+					)
+
 					// -----------------------------------
-					// RUN STRATEGY FOR EACH USER
+					// LOOP USERS
 					// -----------------------------------
 
 					for _, user := range users {
+
+						// -----------------------------------
+						// THROTTLE
+						// -----------------------------------
 
 						if !ShouldSchedule(
 							user.ID,
 							ob.Symbol,
 						) {
+
+							log.Printf(
+								"[SCHEDULER] skipped %s for %s",
+								ob.Symbol,
+								user.ID,
+							)
+
 							continue
 						}
+
+						log.Printf(
+							"[SCHEDULER] accepted %s for %s",
+							ob.Symbol,
+							user.ID,
+						)
+
+						// -----------------------------------
+						// ENQUEUE
+						// -----------------------------------
 
 						select {
 
@@ -89,10 +121,16 @@ func StartEventConsumer(
 							Symbol: ob.Symbol,
 						}:
 
+							log.Printf(
+								"[QUEUE] enqueued %s for %s",
+								ob.Symbol,
+								user.ID,
+							)
+
 						default:
 
 							log.Println(
-								"[WORKER] queue full, dropping job",
+								"[QUEUE] full, dropping job",
 							)
 						}
 					}
@@ -104,7 +142,7 @@ func StartEventConsumer(
 				default:
 
 					log.Printf(
-						"[EVENT] unknown event type: %s",
+						"[EVENT] unknown type: %s",
 						event.Type,
 					)
 				}

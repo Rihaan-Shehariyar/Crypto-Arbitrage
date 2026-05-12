@@ -63,6 +63,12 @@ func handleCross(
 	symbol string,
 ) {
 
+	log.Printf(
+		"[CROSS] evaluating %s for user %s",
+		symbol,
+		userID,
+	)
+
 	orderBooks := feed.GetOrderBooks(
 		symbol,
 	)
@@ -531,5 +537,6 @@ func handleCross(
 				baseAsset,
 			)
 		}
+
 	}
 }
