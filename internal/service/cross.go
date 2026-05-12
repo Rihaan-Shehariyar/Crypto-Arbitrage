@@ -57,7 +57,7 @@ const (
 )
 
 var opportunityCount int
-    
+
 func handleCross(
 	userID string,
 	symbol string,
@@ -103,7 +103,7 @@ func handleCross(
 				metrics.IncStaleBooks()
 
 				continue
-			}   
+			}
 
 			// -----------------------------------
 			// EMPTY ORDERBOOK
