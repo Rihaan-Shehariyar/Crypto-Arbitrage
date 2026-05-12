@@ -180,7 +180,7 @@ func main() {
 	// -----------------------------------
 	// EVENT CONSUMER
 	// -----------------------------------
-
+	service.StartCrossWorkers(10)
 	service.StartEventConsumer(ctx)
 
 	// -----------------------------------

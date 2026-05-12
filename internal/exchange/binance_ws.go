@@ -57,10 +57,11 @@ func (b *BinanceWS) Connect(
 		wsURL,
 	)
 
-	conn, _, err := websocket.DefaultDialer.Dial(
-		wsURL,
-		nil,
-	)
+	conn, _, err :=
+		websocket.DefaultDialer.Dial(
+			wsURL,
+			nil,
+		)
 
 	if err != nil {
 		return err
@@ -79,9 +80,8 @@ func (b *BinanceWS) Connect(
 // SUBSCRIBE
 // -----------------------------------
 
-// Binance combined streams
-// already subscribe through URL.
-// so nothing required here.
+// Binance combined stream already
+// subscribes through URL.
 
 func (b *BinanceWS) Subscribe() error {
 	return nil
@@ -95,18 +95,30 @@ func (b *BinanceWS) ReadLoop() error {
 
 	for {
 
-		// read timeout safety
+		// -----------------------------------
+		// READ DEADLINE
+		// -----------------------------------
+
 		b.conn.SetReadDeadline(
 			time.Now().Add(
 				30 * time.Second,
 			),
 		)
 
-		_, msg, err := b.conn.ReadMessage()
+		// -----------------------------------
+		// READ MESSAGE
+		// -----------------------------------
+
+		_, msg, err :=
+			b.conn.ReadMessage()
 
 		if err != nil {
 			return err
 		}
+
+		// -----------------------------------
+		// RAW PAYLOAD
+		// -----------------------------------
 
 		var raw struct {
 			Stream string `json:"stream"`
@@ -126,61 +138,155 @@ func (b *BinanceWS) ReadLoop() error {
 		)
 
 		if err != nil {
+
+			log.Println(
+				"[BINANCE WS] unmarshal failed:",
+				err,
+			)
+
 			continue
 		}
 
-		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
+		// -----------------------------------
+		// VALIDATE STREAM
+		// -----------------------------------
+
+		if !strings.Contains(
+			raw.Stream,
+			"depth",
+		) {
+			continue
 		}
 
-		// -------------------------
-		// BIDS
-		// -------------------------
-
-		for _, b := range raw.Data.Bids {
-
-			price := parseFloat(b[0])
-
-			qty := parseFloat(b[1])
-
-			ob.Bids = append(
-				ob.Bids,
-				feed.Level{
-					Price: price,
-					Qty:   qty,
-				},
-			)
-		}
-
-		// -------------------------
-		// ASKS
-		// -------------------------
-
-		for _, a := range raw.Data.Asks {
-
-			price := parseFloat(a[0])
-
-			qty := parseFloat(a[1])
-
-			ob.Asks = append(
-				ob.Asks,
-				feed.Level{
-					Price: price,
-					Qty:   qty,
-				},
-			)
-		}
+		// -----------------------------------
+		// SYMBOL
+		// -----------------------------------
 
 		symbol :=
 			strings.ToUpper(
 				raw.Data.Symbol,
 			)
 
+		if symbol == "" {
+			continue
+		}
+
+		// -----------------------------------
+		// EMPTY BOOK CHECK
+		// -----------------------------------
+
+		if len(raw.Data.Bids) == 0 ||
+			len(raw.Data.Asks) == 0 {
+
+			continue
+		}
+
+		// -----------------------------------
+		// ORDERBOOK
+		// -----------------------------------
+
+		ob := feed.OrderBook{
+			Time: time.Now().UnixMilli(),
+		}
+
+		// -----------------------------------
+		// BIDS
+		// -----------------------------------
+
+		for _, b := range raw.Data.Bids {
+
+			if len(b) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				b[0],
+			)
+
+			qty := parseFloat(
+				b[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
+
+			ob.Bids = append(
+				ob.Bids,
+				feed.Level{
+
+					Price: price,
+
+					Qty: qty,
+				},
+			)
+		}
+
+		// -----------------------------------
+		// ASKS
+		// -----------------------------------
+
+		for _, a := range raw.Data.Asks {
+
+			if len(a) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				a[0],
+			)
+
+			qty := parseFloat(
+				a[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
+
+			ob.Asks = append(
+				ob.Asks,
+				feed.Level{
+
+					Price: price,
+
+					Qty: qty,
+				},
+			)
+		}
+
+		// -----------------------------------
+		// FINAL VALIDATION
+		// -----------------------------------
+
+		if len(ob.Bids) == 0 ||
+			len(ob.Asks) == 0 {
+
+			continue
+		}
+
+		// -----------------------------------
+		// UPDATE FEED
+		// -----------------------------------
+
 		feed.UpdateOrderBook(
 			"binance",
 			symbol,
 			ob,
 		)
+
+		log.Printf(
+			"📥 OB UPDATE: binance %s",
+			symbol,
+		)
+
+		// -----------------------------------
+		// PUBLISH EVENT
+		// -----------------------------------
 
 		events.Bus <- events.Event{
 
@@ -216,14 +322,19 @@ func (b *BinanceWS) Close() error {
 	return nil
 }
 
+// -----------------------------------
+// PARSE FLOAT
+// -----------------------------------
+
 func parseFloat(
 	value string,
 ) float64 {
 
-	f, err := strconv.ParseFloat(
-		value,
-		64,
-	)
+	f, err :=
+		strconv.ParseFloat(
+			value,
+			64,
+		)
 
 	if err != nil {
 		return 0

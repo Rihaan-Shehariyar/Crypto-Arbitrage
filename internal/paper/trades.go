@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Trade struct {
@@ -49,7 +50,7 @@ func AddTrade(t Trade) {
 	SaveTrade(t)
 }
 
-func (t *Trade) BeforeCreate(tx interface{}) error {
+func (t *Trade) BeforeCreate(tx *gorm.DB) error {
 	if t.ID == "" {
 		t.ID = uuid.NewString()
 	}

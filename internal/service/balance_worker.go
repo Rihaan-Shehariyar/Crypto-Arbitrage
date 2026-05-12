@@ -20,7 +20,7 @@ func StartBalanceWorker(brokers map[string]broker.Broker) {
 
 				UpdateInventory(name, bal)
 
-				log.Println("BALANCE UPDATE:", name, bal)
+				// log.Println("BALANCE UPDATE:", name, bal)
 			}
 
 			time.Sleep(5 * time.Second)

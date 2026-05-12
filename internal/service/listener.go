@@ -73,10 +73,28 @@ func StartEventConsumer(
 
 					for _, user := range users {
 
-						go handleCross(
+						if !ShouldSchedule(
 							user.ID,
 							ob.Symbol,
-						)
+						) {
+							continue
+						}
+
+						select {
+
+						case CrossJobs <- CrossJob{
+
+							UserID: user.ID,
+
+							Symbol: ob.Symbol,
+						}:
+
+						default:
+
+							log.Println(
+								"[WORKER] queue full, dropping job",
+							)
+						}
 					}
 
 				// -----------------------------------
