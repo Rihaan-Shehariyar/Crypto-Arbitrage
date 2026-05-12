@@ -57,7 +57,7 @@ const (
 )
 
 var opportunityCount int
-
+    
 func handleCross(
 	userID string,
 	symbol string,
