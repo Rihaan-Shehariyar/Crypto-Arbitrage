@@ -103,7 +103,7 @@ func handleCross(
 				metrics.IncStaleBooks()
 
 				continue
-			}
+			}   
 
 			// -----------------------------------
 			// EMPTY ORDERBOOK
