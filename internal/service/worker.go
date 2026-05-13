@@ -13,7 +13,7 @@ type CrossJob struct {
 }  
 
 var CrossJobs = make(
-	chan CrossJob,
+	chan CrossJob,  
 	1000,
 )
 
