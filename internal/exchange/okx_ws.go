@@ -138,8 +138,12 @@ func (o *OKXWS) ReadLoop() error {
 				"",
 			)
 
+		now := time.Now().UnixMilli()
+
 		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
+			Time: now,
+
+			ReceivedAt: now,
 		}
 
 		// BIDS
@@ -195,11 +199,12 @@ func (o *OKXWS) ReadLoop() error {
 
 		err = okxKafkaProducer.Publish(
 			kafka.OrderBookMessage{
-				Exchange: "okx",
-				Symbol:   symbol,
-				Bids:     ob.Bids,
-				Asks:     ob.Asks,
-				Ts:       ob.Time,
+				Exchange:   "okx",
+				Symbol:     symbol,
+				Bids:       ob.Bids,
+				Asks:       ob.Asks,
+				Ts:         ob.Time,
+				ReceivedAt: ob.ReceivedAt,
 			},
 		)
 

@@ -69,12 +69,16 @@ var ExchangeUpdates = prometheus.NewCounterVec(
 // WORKER QUEUE
 // -----------------------------------
 
-var WorkerQueueDepth = prometheus.NewGauge(
+var WorkerQueueDepth = promauto.NewGauge(
+
 	prometheus.GaugeOpts{
+
 		Name: "worker_queue_depth",
+
 		Help: "Current worker queue depth",
 	},
 )
+
 var KafkaLatency = promauto.NewHistogram(
 	prometheus.HistogramOpts{
 		Name: "kafka_latency_ms",
@@ -88,29 +92,3 @@ var KafkaLatency = promauto.NewHistogram(
 		),
 	},
 )
-
-// -----------------------------------
-// INIT
-// -----------------------------------
-
-func Init() {
-
-	prometheus.MustRegister(
-
-		EventsReceived,
-
-		KafkaMessages,
-
-		ArbitrageChecks,
-
-		ProfitableSpreads,
-
-		StaleBooks,
-
-		EngineErrors,
-
-		ExchangeUpdates,
-
-		WorkerQueueDepth,
-	)
-}

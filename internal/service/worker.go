@@ -1,16 +1,21 @@
 package service
 
-import "log"
+import (
+	"crypto-arbitrage/internal/metrics"
+	"log"
+	"time"
+)
 
 type CrossJob struct {
-
-	UserID string
-
-	Symbol string
+	UserID   string
+	QueuedAt int64
+	Symbol   string
 }
 
-var CrossJobs =
-	make(chan CrossJob, 1000)
+var CrossJobs = make(
+	chan CrossJob,
+	1000,
+)
 
 func StartCrossWorkers(
 	count int,
@@ -29,17 +34,28 @@ func StartCrossWorkers(
 
 			for job := range CrossJobs {
 
-				log.Printf(
-					"[WORKER %d] processing %s for user %s",
-					workerID,
-					job.Symbol,
-					job.UserID,
-				)
+				queueWait :=
+					time.Now().UnixMilli() -
+						job.QueuedAt
 
-				handleCross(
-					job.UserID,
-					job.Symbol,
-				)
+				metrics.QueueWaitLatency.
+					Observe(
+						float64(queueWait),
+					)
+
+				start :=
+					time.Now().UnixMilli()
+
+				handleCross(job.UserID,job.Symbol)
+
+				duration :=
+					time.Now().UnixMilli() -
+						start
+
+				metrics.WorkerExecutionLatency.
+					Observe(
+						float64(duration),
+					)
 			}
 
 		}(i)

@@ -163,8 +163,12 @@ func (b *BinanceWS) ReadLoop() error {
 			continue
 		}
 
+		now := time.Now().UnixMilli()
+
 		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
+			Time: now,
+
+			ReceivedAt: now,
 		}
 
 		// -----------------------------------
@@ -262,11 +266,12 @@ func (b *BinanceWS) ReadLoop() error {
 
 		err = kafkaProducer.Publish(
 			kafka.OrderBookMessage{
-				Exchange: "binance",
-				Symbol:   symbol,
-				Bids:     ob.Bids,
-				Asks:     ob.Asks,
-				Ts:       time.Now().UnixMilli(),
+				Exchange:   "binance",
+				Symbol:     symbol,
+				Bids:       ob.Bids,
+				Asks:       ob.Asks,
+				Ts:         time.Now().UnixMilli(),
+				ReceivedAt: ob.ReceivedAt,
 			},
 		)
 

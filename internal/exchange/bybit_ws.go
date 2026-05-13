@@ -103,8 +103,12 @@ func (b *BybitWS) ReadLoop() error {
 			continue
 		}
 
+		now := time.Now().UnixMilli()
+
 		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
+			Time: now,
+
+			ReceivedAt: now,
 		}
 
 		for _, bid := range raw.Data.Bids {
@@ -156,9 +160,10 @@ func (b *BybitWS) ReadLoop() error {
 		err = bybitKafkaProducer.Publish(
 			kafka.OrderBookMessage{
 				Exchange: "bybit", Symbol: raw.Data.Symbol,
-				Bids: ob.Bids,
-				Asks: ob.Asks,
-				Ts:   ob.Time,
+				Bids:       ob.Bids,
+				Asks:       ob.Asks,
+				Ts:         ob.Time,
+				ReceivedAt: ob.ReceivedAt,
 			},
 		)
 

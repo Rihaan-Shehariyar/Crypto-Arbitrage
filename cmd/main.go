@@ -9,7 +9,6 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
 	"crypto-arbitrage/internal/kafka"
-	"crypto-arbitrage/internal/metrics"
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
 	"crypto-arbitrage/internal/service"
@@ -40,7 +39,6 @@ func main() {
 	// -----------------------------------
 
 	db.Connect()
-	metrics.Init()
 
 	db.DB.AutoMigrate(
 		&paper.Trade{},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto-arbitrage/internal/events"
 	"log"
+	"time"
 )
 
 func StartEventConsumer(
@@ -107,7 +108,8 @@ func StartEventConsumer(
 
 							UserID: user.ID,
 
-							Symbol: ob.Symbol,
+							Symbol:   ob.Symbol,
+							QueuedAt: time.Now().UnixMilli(),
 						}:
 
 							log.Printf(

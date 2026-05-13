@@ -182,10 +182,13 @@ func (g *GateWS) ReadLoop() error {
 		// ORDERBOOK
 		// -----------------------------------
 
-		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
-		}
+		now := time.Now().UnixMilli()
 
+		ob := feed.OrderBook{
+			Time: now,
+
+			ReceivedAt: now,
+		}
 		// -----------------------------------
 		// BIDS
 		// -----------------------------------
@@ -298,11 +301,12 @@ func (g *GateWS) ReadLoop() error {
 
 		err = gateKafkaProducer.Publish(
 			kafka.OrderBookMessage{
-				Exchange: "gate",
-				Symbol:   symbol,
-				Bids:     ob.Bids,
-				Asks:     ob.Asks,
-				Ts:       ob.Time,
+				Exchange:   "gate",
+				Symbol:     symbol,
+				Bids:       ob.Bids,
+				Asks:       ob.Asks,
+				Ts:         ob.Time,
+				ReceivedAt: ob.ReceivedAt,
 			},
 		)
 

@@ -233,8 +233,12 @@ func (k *KucoinWS) ReadLoop() error {
 		// ORDERBOOK
 		// -----------------------------------
 
+		now := time.Now().UnixMilli()
+
 		ob := feed.OrderBook{
-			Time: time.Now().UnixMilli(),
+			Time: now,
+
+			ReceivedAt: now,
 		}
 
 		// -----------------------------------
@@ -359,19 +363,18 @@ func (k *KucoinWS) ReadLoop() error {
 
 		err = kucoinKafkaProducer.Publish(
 			kafka.OrderBookMessage{
-				Exchange: "kucoin",
-				Symbol:   symbol,
-				Bids:     ob.Bids,
-				Asks:     ob.Asks,
-				Ts:       ob.Time,
+				Exchange:   "kucoin",
+				Symbol:     symbol,
+				Bids:       ob.Bids,
+				Asks:       ob.Asks,
+				Ts:         ob.Time,
+				ReceivedAt: ob.ReceivedAt,
 			},
 		)
 
 		if err != nil {
 
 			metrics.EngineErrors.Inc()
-
-
 
 			log.Println(
 				"[KAFKA] publish failed:",

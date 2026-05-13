@@ -113,7 +113,16 @@ func (c *Consumer) Start() {
 			},
 		}
 		now := time.Now().UnixMilli()
+		if obMsg.ReceivedAt > 0 {
 
+			latency :=
+				time.Now().UnixMilli() -
+					obMsg.ReceivedAt
+
+			metrics.KafkaLatency.Observe(
+				float64(latency),
+			)
+		}
 		kafkaLatency :=
 			now - obMsg.ReceivedAt
 
