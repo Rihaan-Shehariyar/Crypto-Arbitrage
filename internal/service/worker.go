@@ -10,7 +10,7 @@ type CrossJob struct {
 	UserID   string
 	QueuedAt int64
 	Symbol   string
-}
+}  
 
 var CrossJobs = make(
 	chan CrossJob,
