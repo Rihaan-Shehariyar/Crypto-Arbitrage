@@ -2,8 +2,9 @@ package exchange
 
 import (
 	"bytes"
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/metrics"
 	"encoding/json"
 	"io"
 	"log"
@@ -19,6 +20,14 @@ type KucoinWS struct {
 
 	symbols []string
 }
+
+// -----------------------------------
+// KAFKA
+// -----------------------------------
+
+var kucoinKafkaProducer = kafka.NewProducer(
+	"localhost:9092",
+)
 
 // -----------------------------------
 // NAME
@@ -173,10 +182,15 @@ func (k *KucoinWS) ReadLoop() error {
 		_, msg, err := k.conn.ReadMessage()
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
 			return err
 		}
 
 		var raw struct {
+			Type string `json:"type"`
+
 			Topic string `json:"topic"`
 
 			Data struct {
@@ -192,6 +206,22 @@ func (k *KucoinWS) ReadLoop() error {
 		)
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+			log.Println(
+				"[KUCOIN] unmarshal failed:",
+				err,
+			)
+
+			continue
+		}
+
+		// -----------------------------------
+		// VALID MESSAGE
+		// -----------------------------------
+
+		if raw.Type != "message" {
 			continue
 		}
 
@@ -199,61 +229,162 @@ func (k *KucoinWS) ReadLoop() error {
 			continue
 		}
 
+		// -----------------------------------
+		// ORDERBOOK
+		// -----------------------------------
+
 		ob := feed.OrderBook{
 			Time: time.Now().UnixMilli(),
 		}
 
-		for _, b := range raw.Data.Bids {
+		// -----------------------------------
+		// BIDS
+		// -----------------------------------
+
+		for _, bid := range raw.Data.Bids {
+
+			if len(bid) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				bid[0],
+			)
+
+			qty := parseFloat(
+				bid[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
 
 			ob.Bids = append(
 				ob.Bids,
 				feed.Level{
-					Price: parseFloat(b[0]),
-					Qty:   parseFloat(b[1]),
+					Price: price,
+					Qty:   qty,
 				},
 			)
 		}
 
-		for _, a := range raw.Data.Asks {
+		// -----------------------------------
+		// ASKS
+		// -----------------------------------
+
+		for _, ask := range raw.Data.Asks {
+
+			if len(ask) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				ask[0],
+			)
+
+			qty := parseFloat(
+				ask[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
 
 			ob.Asks = append(
 				ob.Asks,
 				feed.Level{
-					Price: parseFloat(a[0]),
-					Qty:   parseFloat(a[1]),
+					Price: price,
+					Qty:   qty,
 				},
 			)
 		}
 
-		symbol :=
+		// -----------------------------------
+		// VALIDATE BOOK
+		// -----------------------------------
+
+		if len(ob.Bids) == 0 ||
+			len(ob.Asks) == 0 {
+
+			continue
+		}
+
+		// -----------------------------------
+		// SYMBOL
+		// -----------------------------------
+
+		parts :=
 			strings.Split(
 				raw.Topic,
 				":",
 			)
 
-		if len(symbol) < 2 {
+		if len(parts) < 2 {
 			continue
 		}
 
+		symbol :=
+			strings.ReplaceAll(
+				parts[1],
+				"-",
+				"",
+			)
+
+		// -----------------------------------
+		// UPDATE FEED
+		// -----------------------------------
+
 		feed.UpdateOrderBook(
 			"kucoin",
-			symbol[1],
+			symbol,
 			ob,
 		)
 
-		events.Bus <- events.Event{
+		// -----------------------------------
+		// METRICS
+		// -----------------------------------
 
-			Type: "ORDERBOOK",
+		log.Printf(
+			"📥 OB UPDATE: kucoin %s",
+			symbol,
+		)
 
-			Data: events.OrderBookEvent{
+		// -----------------------------------
+		// KAFKA PUBLISH
+		// -----------------------------------
 
+		err = kucoinKafkaProducer.Publish(
+			kafka.OrderBookMessage{
 				Exchange: "kucoin",
-
-				Symbol: symbol[1],
-
-				OrderBook: ob,
+				Symbol:   symbol,
+				Bids:     ob.Bids,
+				Asks:     ob.Asks,
+				Ts:       ob.Time,
 			},
+		)
+
+		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+
+
+			log.Println(
+				"[KAFKA] publish failed:",
+				err,
+			)
+
+			continue
 		}
+
+		log.Printf(
+			"[KAFKA] published kucoin %s",
+			symbol,
+		)
 	}
 }
 

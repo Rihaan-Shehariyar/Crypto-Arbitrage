@@ -1,8 +1,11 @@
+// okx_ws.go
+
 package exchange
 
 import (
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/metrics"
 	"encoding/json"
 	"log"
 	"strings"
@@ -13,40 +16,32 @@ import (
 
 type OKXWS struct {
 	conn *websocket.Conn
-
-	symbols []string
 }
 
-// -----------------------------------
-// NAME
-// -----------------------------------
+var okxKafkaProducer = kafka.NewProducer(
+	"localhost:9092",
+)
 
 func (o *OKXWS) Name() string {
 	return "OKX"
 }
 
-// -----------------------------------
-// CONNECT
-// -----------------------------------
-
 func (o *OKXWS) Connect(
 	symbols []string,
 ) error {
 
-	o.symbols = symbols
-
-	wsURL :=
-		"wss://ws.okx.com:8443/ws/v5/public"
+	url := "wss://ws.okx.com:8443/ws/v5/public"
 
 	log.Println(
 		"[OKX WS] connecting:",
-		wsURL,
+		url,
 	)
 
-	conn, _, err := websocket.DefaultDialer.Dial(
-		wsURL,
-		nil,
-	)
+	conn, _, err :=
+		websocket.DefaultDialer.Dial(
+			url,
+			nil,
+		)
 
 	if err != nil {
 		return err
@@ -58,25 +53,14 @@ func (o *OKXWS) Connect(
 		"[OKX WS] connected",
 	)
 
-	return nil
-}
+	args := []map[string]string{}
 
-// -----------------------------------
-// SUBSCRIBE
-// -----------------------------------
-
-func (o *OKXWS) Subscribe() error {
-
-	var args []map[string]string
-
-	for _, s := range o.symbols {
+	for _, symbol := range symbols {
 
 		instID :=
-			strings.ReplaceAll(
-				strings.ToUpper(s),
-				"USDT",
-				"-USDT",
-			)
+			strings.ToUpper(
+				symbol[:len(symbol)-4],
+			) + "-USDT"
 
 		args = append(
 			args,
@@ -87,98 +71,45 @@ func (o *OKXWS) Subscribe() error {
 		)
 	}
 
-	payload := map[string]interface{}{
+	sub := map[string]interface{}{
 		"op":   "subscribe",
 		"args": args,
 	}
 
-	err := o.conn.WriteJSON(payload)
+	err = o.conn.WriteJSON(sub)
 
 	if err != nil {
 		return err
 	}
 
 	log.Printf(
-		"[OKX WS] subscribed",
+		"[OKX WS] subscribed: %v",
+		args,
 	)
 
 	return nil
 }
 
-// -----------------------------------
-// HEARTBEAT
-// -----------------------------------
-
-func (o *OKXWS) startHeartbeat() {
-
-	go func() {
-
-		ticker := time.NewTicker(
-			20 * time.Second,
-		)
-
-		defer ticker.Stop()
-
-		for range ticker.C {
-
-			if o.conn == nil {
-				return
-			}
-
-			err := o.conn.WriteMessage(
-				websocket.TextMessage,
-				[]byte("ping"),
-			)
-
-			if err != nil {
-
-				log.Println(
-					"[OKX WS] ping error:",
-					err,
-				)
-
-				return
-			}
-		}
-	}()
+func (o *OKXWS) Subscribe() error {
+	return nil
 }
-
-// -----------------------------------
-// READ LOOP
-// -----------------------------------
 
 func (o *OKXWS) ReadLoop() error {
 
-	o.startHeartbeat()
-
 	for {
 
-		o.conn.SetReadDeadline(
-			time.Now().Add(
-				30 * time.Second,
-			),
-		)
-
-		_, msg, err := o.conn.ReadMessage()
+		_, msg, err :=
+			o.conn.ReadMessage()
 
 		if err != nil {
 			return err
 		}
 
-		// pong response
-		if string(msg) == "pong" {
-			continue
-		}
-
 		var raw struct {
-			Arg struct {
-				InstID string `json:"instId"`
-			} `json:"arg"`
-
 			Data []struct {
-				Bids [][]string `json:"bids"`
-
-				Asks [][]string `json:"asks"`
+				InstID string     `json:"instId"`
+				Bids   [][]string `json:"bids"`
+				Asks   [][]string `json:"asks"`
 			} `json:"data"`
 		}
 
@@ -188,6 +119,9 @@ func (o *OKXWS) ReadLoop() error {
 		)
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
 			continue
 		}
 
@@ -195,54 +129,58 @@ func (o *OKXWS) ReadLoop() error {
 			continue
 		}
 
+		data := raw.Data[0]
+
+		symbol :=
+			strings.ReplaceAll(
+				data.InstID,
+				"-",
+				"",
+			)
+
 		ob := feed.OrderBook{
 			Time: time.Now().UnixMilli(),
 		}
 
-		// -------------------------
 		// BIDS
-		// -------------------------
 
-		for _, b := range raw.Data[0].Bids {
+		for _, bid := range data.Bids {
 
-			price := parseFloat(b[0])
-
-			qty := parseFloat(b[1])
+			if len(bid) < 2 {
+				continue
+			}
 
 			ob.Bids = append(
 				ob.Bids,
 				feed.Level{
-					Price: price,
-					Qty:   qty,
+					Price: parseFloat(bid[0]),
+					Qty:   parseFloat(bid[1]),
 				},
 			)
 		}
 
-		// -------------------------
 		// ASKS
-		// -------------------------
 
-		for _, a := range raw.Data[0].Asks {
+		for _, ask := range data.Asks {
 
-			price := parseFloat(a[0])
-
-			qty := parseFloat(a[1])
+			if len(ask) < 2 {
+				continue
+			}
 
 			ob.Asks = append(
 				ob.Asks,
 				feed.Level{
-					Price: price,
-					Qty:   qty,
+					Price: parseFloat(ask[0]),
+					Qty:   parseFloat(ask[1]),
 				},
 			)
 		}
 
-		symbol :=
-			strings.ReplaceAll(
-				raw.Arg.InstID,
-				"-",
-				"",
-			)
+		if len(ob.Bids) == 0 ||
+			len(ob.Asks) == 0 {
+
+			continue
+		}
 
 		feed.UpdateOrderBook(
 			"okx",
@@ -250,25 +188,39 @@ func (o *OKXWS) ReadLoop() error {
 			ob,
 		)
 
-		events.Bus <- events.Event{
+		log.Printf(
+			"📥 OB UPDATE: okx %s",
+			symbol,
+		)
 
-			Type: "ORDERBOOK",
-
-			Data: events.OrderBookEvent{
-
+		err = okxKafkaProducer.Publish(
+			kafka.OrderBookMessage{
 				Exchange: "okx",
-
-				Symbol: symbol,
-
-				OrderBook: ob,
+				Symbol:   symbol,
+				Bids:     ob.Bids,
+				Asks:     ob.Asks,
+				Ts:       ob.Time,
 			},
+		)
+
+		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+			log.Println(
+				"[KAFKA] publish failed:",
+				err,
+			)
+
+			continue
 		}
+
+		log.Printf(
+			"[KAFKA] published okx %s",
+			symbol,
+		)
 	}
 }
-
-// -----------------------------------
-// CLOSE
-// -----------------------------------
 
 func (o *OKXWS) Close() error {
 

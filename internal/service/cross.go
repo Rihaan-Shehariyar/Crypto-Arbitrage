@@ -1,15 +1,10 @@
 package service
 
 import (
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
-	"crypto-arbitrage/internal/inventory"
-	"crypto-arbitrage/internal/journal"
 	"crypto-arbitrage/internal/metrics"
 	"crypto-arbitrage/internal/paper"
-	"crypto-arbitrage/internal/risk"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,33 +13,29 @@ import (
 
 var tradeLock sync.Map
 
-func lock(
-	userID string,
-	symbol string,
-) bool {
+// -----------------------------------
+// LOCK
+// -----------------------------------
 
-	key :=
-		userID + ":" + symbol
+func lock(symbol string) bool {
 
 	_, loaded :=
 		tradeLock.LoadOrStore(
-			key,
+			symbol,
 			true,
 		)
 
 	return !loaded
 }
 
-func unlock(
-	userID string,
-	symbol string,
-) {
+func unlock(symbol string) {
 
-	key :=
-		userID + ":" + symbol
-
-	tradeLock.Delete(key)
+	tradeLock.Delete(symbol)
 }
+
+// -----------------------------------
+// CONFIG
+// -----------------------------------
 
 const (
 	feeRate        = 0.001 // 0.1%
@@ -58,6 +49,10 @@ const (
 
 var opportunityCount int
 
+// -----------------------------------
+// HANDLE CROSS
+// -----------------------------------
+
 func handleCross(
 	userID string,
 	symbol string,
@@ -69,21 +64,55 @@ func handleCross(
 		userID,
 	)
 
-	orderBooks := feed.GetOrderBooks(
+	// -----------------------------------
+	// METRICS
+	// -----------------------------------
+
+	metrics.ArbitrageChecks.Inc()
+
+	metrics.WorkerQueueDepth.Set(
+		float64(len(CrossJobs)),
+	)
+
+	// -----------------------------------
+	// GET ORDERBOOKS
+	// -----------------------------------
+
+	orderBooks :=
+		feed.GetOrderBooks(symbol)
+
+	log.Printf(
+		"[CROSS] orderbooks for %s = %d",
 		symbol,
+		len(orderBooks),
 	)
 
 	if orderBooks == nil ||
 		len(orderBooks) < 2 {
+
+		log.Printf(
+			"[CROSS] insufficient orderbooks for %s",
+			symbol,
+		)
 
 		return
 	}
 
 	now := time.Now().UnixMilli()
 
+	// -----------------------------------
+	// LOOP EXCHANGES
+	// -----------------------------------
+
 	for buyEx, buyOB := range orderBooks {
 
 		for sellEx, sellOB := range orderBooks {
+
+			log.Printf(
+				"[CROSS] compare %s -> %s",
+				buyEx,
+				sellEx,
+			)
 
 			// -----------------------------------
 			// SAME EXCHANGE
@@ -94,58 +123,127 @@ func handleCross(
 			}
 
 			// -----------------------------------
-			// STALE DATA
+			// STALE CHECK
 			// -----------------------------------
 
-			if now-buyOB.Time > 1000 ||
-				now-sellOB.Time > 1000 {
+			if now-buyOB.Time > 3000 {
 
-				metrics.IncStaleBooks()
+				metrics.StaleBooks.Inc()
+
+				log.Printf(
+					"[CROSS] stale buy book %s",
+					buyEx,
+				)
+
+				continue
+			}
+
+			if now-sellOB.Time > 3000 {
+
+				metrics.StaleBooks.Inc()
+
+				log.Printf(
+					"[CROSS] stale sell book %s",
+					sellEx,
+				)
 
 				continue
 			}
 
 			// -----------------------------------
-			// EMPTY ORDERBOOK
+			// EMPTY CHECK
 			// -----------------------------------
 
-			if len(buyOB.Asks) == 0 ||
-				len(sellOB.Bids) == 0 {
-
-				continue
-			}
-
-			// -----------------------------------
-			// DEPTH-AWARE BUY
-			// -----------------------------------
-
-			avgBuy, qty := simulateBuy(
-				buyOB.Asks,
-				maxCapital,
+			log.Printf(
+				"[CROSS] %s asks=%d | %s bids=%d",
+				buyEx,
+				len(buyOB.Asks),
+				sellEx,
+				len(sellOB.Bids),
 			)
+
+			if len(buyOB.Asks) == 0 {
+
+				log.Printf(
+					"[CROSS] empty asks on %s",
+					buyEx,
+				)
+
+				continue
+			}
+
+			if len(sellOB.Bids) == 0 {
+
+				log.Printf(
+					"[CROSS] empty bids on %s",
+					sellEx,
+				)
+
+				continue
+			}
+
+			// -----------------------------------
+			// DEPTH BUY
+			// -----------------------------------
+
+			avgBuy, qty :=
+				simulateBuy(
+					buyOB.Asks,
+					maxCapital,
+				)
 
 			if qty <= 0 {
+
+				log.Printf(
+					"[CROSS] invalid qty on buy %s",
+					buyEx,
+				)
+
 				continue
 			}
 
-			tradeValue := qty * avgBuy
+			tradeValue :=
+				qty * avgBuy
 
 			if tradeValue < minTradeValue {
+
+				log.Printf(
+					"[CROSS] trade value too low %.4f",
+					tradeValue,
+				)
+
 				continue
 			}
 
 			// -----------------------------------
-			// DEPTH-AWARE SELL
+			// DEPTH SELL
 			// -----------------------------------
 
-			avgSell := simulateSell(
-				sellOB.Bids,
-				qty,
-			)
+			avgSell :=
+				simulateSell(
+					sellOB.Bids,
+					qty,
+				)
 
 			if avgSell == 0 {
+
+				log.Printf(
+					"[CROSS] invalid sell on %s",
+					sellEx,
+				)
+
 				continue
 			}
+
+			// -----------------------------------
+			// PRICES
+			// -----------------------------------
+
+			log.Printf(
+				"[CROSS] prices buy=%.4f sell=%.4f",
+				avgBuy,
+				avgSell,
+			)
 
 			// -----------------------------------
 			// SPREAD
@@ -177,164 +275,46 @@ func handleCross(
 			// -----------------------------------
 
 			if netSpread <= 0 {
+
+				log.Printf(
+					"[CROSS] not profitable",
+				)
+
 				continue
 			}
+
+			metrics.ProfitableSpreads.Inc()
 
 			// -----------------------------------
 			// USER METRICS
 			// -----------------------------------
 
-			userMetrics := metrics.GetUserMetrics(
-				userID,
-			)
+			userMetrics :=
+				metrics.GetUserMetrics(userID)
 
 			userMetrics.TotalOpportunities++
 
 			// -----------------------------------
-			// RISK VALIDATION
+			// LOCK
 			// -----------------------------------
 
-			err := risk.ValidateTrade(
-
-				risk.TradeRequest{
-
-					Symbol: symbol,
-
-					BuyExchange:  buyEx,
-					SellExchange: sellEx,
-
-					BuyPrice:  avgBuy,
-					SellPrice: avgSell,
-
-					Quantity: qty,
-
-					Spread: netSpread,
-
-					Capital: tradeValue,
-				},
-			)
-
-			if err != nil {
+			if !lock(symbol) {
 
 				log.Printf(
-					"[RISK BLOCKED] %v",
-					err,
-				)
-
-				continue
-			}
-
-			// -----------------------------------
-			// INVENTORY CHECK
-			// -----------------------------------
-
-			baseAsset :=
-				strings.TrimSuffix(
-					symbol,
-					"USDT",
-				)
-
-			if !inventory.HasInventory(
-
-				buyEx,
-				sellEx,
-
-				baseAsset,
-
-				tradeValue,
-				qty,
-			) {
-
-				log.Printf(
-					"[INVENTORY BLOCKED] %s",
+					"[CROSS] symbol locked %s",
 					symbol,
 				)
 
-				continue
-			}
-
-			// -----------------------------------
-			// LOCK SYMBOL
-			// -----------------------------------
-
-			if !lock(
-				userID,
-				symbol,
-			) {
 				continue
 			}
 
 			opportunityCount++
 
-			tradeID := uuid.NewString()
-
-			// -----------------------------------
-			// CREATE TRADE
-			// -----------------------------------
-
-			trade := paper.Trade{
-
-				ID: tradeID,
-
-				UserID: userID,
-
-				Symbol: symbol,
-
-				BuyExchange:  buyEx,
-				SellExchange: sellEx,
-
-				BuyPrice:  avgBuy,
-				SellPrice: avgSell,
-
-				Quantity: qty,
-
-				Status: paper.StatusPending,
-
-				Time: time.Now(),
-			}
-
-			paper.AddTrade(trade)
-
-			userMetrics.TotalTrades++
-
-			// -----------------------------------
-			// JOURNAL
-			// -----------------------------------
-
-			journal.Add(
-				trade.ID,
-				"OPPORTUNITY",
-				"arbitrage opportunity detected",
-			)
-
-			// -----------------------------------
-			// PUBLISH EVENT
-			// -----------------------------------
-
-			events.Bus <- events.Event{
-
-				Type: "OPPORTUNITY",
-
-				Data: events.OpportunityEvent{
-
-					Symbol: symbol,
-
-					BuyExchange:  buyEx,
-					SellExchange: sellEx,
-
-					BuyPrice:  avgBuy,
-					SellPrice: avgSell,
-
-					Spread: netSpread,
-
-					ProfitUSDT: (avgSell - avgBuy) * qty,
-
-					Time: time.Now().UnixMilli(),
-				},
-			}
+			tradeID :=
+				uuid.NewString()
 
 			log.Printf(
-				"[TRADE:%s] 🔥 OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
+				"[TRADE:%s] OPPORTUNITY #%d | %s | BUY %s → SELL %s | NET %.4f%%",
 				tradeID,
 				opportunityCount,
 				symbol,
@@ -348,66 +328,25 @@ func handleCross(
 			// -----------------------------------
 
 			go func(
-				userID string,
-				trade paper.Trade,
+				tradeID string,
 				symbol string,
 				buyEx string,
 				sellEx string,
 				avgBuy float64,
 				avgSell float64,
 				qty float64,
-				tradeValue float64,
-				baseAsset string,
 			) {
 
-				defer unlock(
-					userID,
-					symbol,
-				)
+				defer unlock(symbol)
+
 				start := time.Now()
 
 				log.Printf(
-					"[TRADE:%s] 🧪 PAPER EXECUTION %s | BUY %s → SELL %s",
-					trade.ID,
-					symbol,
-					buyEx,
-					sellEx,
+					"[TRADE:%s] PAPER EXECUTION",
+					tradeID,
 				)
 
-				// -----------------------------------
-				// BUYING
-				// -----------------------------------
-
-				trade.Status =
-					paper.StatusBuying
-
-				paper.UpdateTrade(trade)
-
-				journal.Add(
-					trade.ID,
-					"BUYING",
-					"paper buy started",
-				)
-
-				// -----------------------------------
-				// INVENTORY UPDATE (BUY)
-				// -----------------------------------
-
-				inventory.SubInventory(
-					buyEx,
-					"USDT",
-					tradeValue,
-				)
-
-				inventory.AddInventory(
-					buyEx,
-					baseAsset,
-					qty,
-				)
-
-				// -----------------------------------
-				// PAPER BUY
-				// -----------------------------------
+				// BUY
 
 				paper.Buy(
 					symbol,
@@ -415,68 +354,18 @@ func handleCross(
 					maxCapital,
 				)
 
-				// -----------------------------------
-				// BUY FILLED
-				// -----------------------------------
-
-				trade.Status =
-					paper.StatusBuyFilled
-
-				paper.UpdateTrade(trade)
-
-				journal.Add(
-					trade.ID,
-					"BUY_FILLED",
-					"buy completed",
-				)
-
 				time.Sleep(
 					500 * time.Millisecond,
 				)
 
-				// -----------------------------------
-				// SELLING
-				// -----------------------------------
-
-				trade.Status =
-					paper.StatusSelling
-
-				paper.UpdateTrade(trade)
-
-				journal.Add(
-					trade.ID,
-					"SELLING",
-					"paper sell started",
-				)
-
-				// -----------------------------------
-				// INVENTORY UPDATE (SELL)
-				// -----------------------------------
-
-				inventory.SubInventory(
-					sellEx,
-					baseAsset,
-					qty,
-				)
-
-				inventory.AddInventory(
-					sellEx,
-					"USDT",
-					qty*avgSell,
-				)
-
-				// -----------------------------------
-				// PAPER SELL
-				// -----------------------------------
+				// SELL
 
 				paper.Sell(
 					symbol,
 					avgSell,
 				)
 
-				// -----------------------------------
 				// PROFIT
-				// -----------------------------------
 
 				profitUSDT :=
 					(avgSell - avgBuy) * qty
@@ -488,55 +377,70 @@ func handleCross(
 					time.Since(start)
 
 				// -----------------------------------
-				// CLOSED
+				// USER METRICS
 				// -----------------------------------
 
-				trade.ProfitUSDT =
-					profitUSDT
+				userMetrics :=
+					metrics.GetUserMetrics(userID)
 
-				trade.ProfitPercent =
-					profitPercent
-
-				trade.Status =
-					paper.StatusClosed
-
-				trade.LatencyMs =
-					duration.Milliseconds()
-
-				paper.UpdateTrade(trade)
-
-				journal.Add(
-					trade.ID,
-					"CLOSED",
-					"trade closed successfully",
-				)
+				userMetrics.TotalTrades++
 
 				userMetrics.ClosedTrades++
 
 				userMetrics.ProfitUSDT +=
 					profitUSDT
 
+				// -----------------------------------
+				// STORE
+				// -----------------------------------
+
+				paper.AddTrade(
+					paper.Trade{
+
+						ID: tradeID,
+
+						Symbol: symbol,
+
+						BuyExchange: buyEx,
+
+						SellExchange: sellEx,
+
+						BuyPrice: avgBuy,
+
+						SellPrice: avgSell,
+
+						Quantity: qty,
+
+						ProfitUSDT: profitUSDT,
+
+						ProfitPercent: profitPercent,
+
+						Status: "CLOSED",
+
+						LatencyMs: duration.Milliseconds(),
+
+						Time: time.Now(),
+					},
+				)
+
 				log.Printf(
-					"[TRADE:%s] ✅ CLOSED | %s | PnL %.4f USDT (%.4f%%) | %d ms",
-					trade.ID,
+					"[TRADE:%s] CLOSED | %s | %.4f USDT (%.4f%%) | %d ms",
+					tradeID,
 					symbol,
 					profitUSDT,
 					profitPercent,
 					duration.Milliseconds(),
 				)
 
-			}(userID,
-				trade,
+			}(
+				tradeID,
 				symbol,
 				buyEx,
 				sellEx,
 				avgBuy,
 				avgSell,
 				qty,
-				tradeValue,
-				baseAsset,
 			)
 		}
-
 	}
 }

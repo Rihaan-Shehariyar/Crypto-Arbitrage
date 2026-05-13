@@ -1,8 +1,9 @@
 package exchange
 
 import (
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/metrics"
 	"encoding/json"
 	"log"
 	"strings"
@@ -16,6 +17,14 @@ type GateWS struct {
 
 	symbols []string
 }
+
+// -----------------------------------
+// KAFKA
+// -----------------------------------
+
+var gateKafkaProducer = kafka.NewProducer(
+	"localhost:9092",
+)
 
 // -----------------------------------
 // NAME
@@ -118,6 +127,9 @@ func (g *GateWS) ReadLoop() error {
 		_, msg, err := g.conn.ReadMessage()
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
 			return err
 		}
 
@@ -137,38 +149,122 @@ func (g *GateWS) ReadLoop() error {
 		)
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+			log.Println(
+				"[GATE] unmarshal failed:",
+				err,
+			)
+
 			continue
 		}
+
+		// -----------------------------------
+		// EMPTY SYMBOL
+		// -----------------------------------
 
 		if raw.Result.Symbol == "" {
 			continue
 		}
 
+		// -----------------------------------
+		// EMPTY BOOKS
+		// -----------------------------------
+
+		if len(raw.Result.Bids) == 0 ||
+			len(raw.Result.Asks) == 0 {
+
+			continue
+		}
+
+		// -----------------------------------
+		// ORDERBOOK
+		// -----------------------------------
+
 		ob := feed.OrderBook{
 			Time: time.Now().UnixMilli(),
 		}
 
-		for _, b := range raw.Result.Bids {
+		// -----------------------------------
+		// BIDS
+		// -----------------------------------
+
+		for _, bid := range raw.Result.Bids {
+
+			if len(bid) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				bid[0],
+			)
+
+			qty := parseFloat(
+				bid[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
 
 			ob.Bids = append(
 				ob.Bids,
 				feed.Level{
-					Price: parseFloat(b[0]),
-					Qty:   parseFloat(b[1]),
+					Price: price,
+					Qty:   qty,
 				},
 			)
 		}
 
-		for _, a := range raw.Result.Asks {
+		// -----------------------------------
+		// ASKS
+		// -----------------------------------
+
+		for _, ask := range raw.Result.Asks {
+
+			if len(ask) < 2 {
+				continue
+			}
+
+			price := parseFloat(
+				ask[0],
+			)
+
+			qty := parseFloat(
+				ask[1],
+			)
+
+			if price <= 0 ||
+				qty <= 0 {
+
+				continue
+			}
 
 			ob.Asks = append(
 				ob.Asks,
 				feed.Level{
-					Price: parseFloat(a[0]),
-					Qty:   parseFloat(a[1]),
+					Price: price,
+					Qty:   qty,
 				},
 			)
 		}
+
+		// -----------------------------------
+		// VALIDATE FINAL BOOK
+		// -----------------------------------
+
+		if len(ob.Bids) == 0 ||
+			len(ob.Asks) == 0 {
+
+			continue
+		}
+
+		// -----------------------------------
+		// NORMALIZE SYMBOL
+		// -----------------------------------
 
 		symbol :=
 			strings.ReplaceAll(
@@ -177,25 +273,55 @@ func (g *GateWS) ReadLoop() error {
 				"",
 			)
 
+		// -----------------------------------
+		// UPDATE FEED
+		// -----------------------------------
+
 		feed.UpdateOrderBook(
 			"gate",
 			symbol,
 			ob,
 		)
 
-		events.Bus <- events.Event{
+		// -----------------------------------
+		// METRICS
+		// -----------------------------------
 
-			Type: "ORDERBOOK",
+		log.Printf(
+			"📥 OB UPDATE: gate %s",
+			symbol,
+		)
 
-			Data: events.OrderBookEvent{
+		// -----------------------------------
+		// KAFKA PUBLISH
+		// -----------------------------------
 
+		err = gateKafkaProducer.Publish(
+			kafka.OrderBookMessage{
 				Exchange: "gate",
-
-				Symbol: symbol,
-
-				OrderBook: ob,
+				Symbol:   symbol,
+				Bids:     ob.Bids,
+				Asks:     ob.Asks,
+				Ts:       ob.Time,
 			},
+		)
+
+		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+			log.Println(
+				"[KAFKA] publish failed:",
+				err,
+			)
+
+			continue
 		}
+
+		log.Printf(
+			"[KAFKA] published gate %s",
+			symbol,
+		)
 	}
 }
 

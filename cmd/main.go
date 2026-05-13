@@ -8,6 +8,8 @@ import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
+	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/metrics"
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
 	"crypto-arbitrage/internal/service"
@@ -22,6 +24,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -37,6 +40,7 @@ func main() {
 	// -----------------------------------
 
 	db.Connect()
+	metrics.Init()
 
 	db.DB.AutoMigrate(
 		&paper.Trade{},
@@ -86,6 +90,28 @@ func main() {
 	f := feed.NewFeed()
 
 	_ = f
+
+	// -----------------------------------
+	// KAFKA
+	// -----------------------------------
+
+	producer :=
+		kafka.NewProducer(
+			"localhost:9092",
+		)
+
+	consumer :=
+		kafka.NewConsumer(
+			"localhost:9092",
+		)
+
+	go consumer.Start()
+
+	log.Println(
+		"Kafka initialized",
+	)
+
+	_ = producer
 
 	// -----------------------------------
 	// EXCHANGES
@@ -180,7 +206,11 @@ func main() {
 	// -----------------------------------
 	// EVENT CONSUMER
 	// -----------------------------------
+
+	service.StartUserCache()
+
 	service.StartCrossWorkers(10)
+
 	service.StartEventConsumer(ctx)
 
 	// -----------------------------------
@@ -201,7 +231,16 @@ func main() {
 		cors.Default(),
 	)
 
-	// PUBLIC
+	// -----------------------------------
+	// PUBLIC ROUTES
+	// -----------------------------------
+
+	r.GET(
+		"/metrics",
+		gin.WrapH(
+			promhttp.Handler(),
+		),
+	)
 
 	r.GET(
 		"/ws",
@@ -322,9 +361,17 @@ func main() {
 
 	defer cancelTimeout()
 
-	srv.Shutdown(
+	err = srv.Shutdown(
 		ctxTimeout,
 	)
+
+	if err != nil {
+
+		log.Println(
+			"Server shutdown error:",
+			err,
+		)
+	}
 
 	websocket.CloseAll()
 

@@ -2,53 +2,149 @@ package service
 
 import "crypto-arbitrage/internal/feed"
 
-func simulateBuy(asks []feed.Level, capital float64) (float64, float64) {
-	remaining := capital
+// -----------------------------------
+// SIMULATE BUY
+// -----------------------------------
+
+func simulateBuy(
+	asks []feed.Level,
+	capital float64,
+) (float64, float64) {
+
+	remaining :=
+		capital
+
 	totalCost := 0.0
-	amount := 0.0
+
+	totalQty := 0.0
 
 	for _, ask := range asks {
-		levelValue := ask.Price * ask.Amount
+
+		// -------------------------
+		// VALIDATION
+		// -------------------------
+
+		if ask.Price <= 0 ||
+			ask.Qty <= 0 {
+
+			continue
+		}
+
+		levelValue :=
+			ask.Price * ask.Qty
+
+		// -------------------------
+		// PARTIAL FILL
+		// -------------------------
 
 		if remaining <= levelValue {
-			qty := remaining / ask.Price
-			totalCost += qty * ask.Price
-			amount += qty
+
+			qty :=
+				remaining / ask.Price
+
+			totalCost +=
+				qty * ask.Price
+
+			totalQty += qty
+
+			remaining = 0
+
 			break
 		}
 
+		// -------------------------
+		// FULL LEVEL
+		// -------------------------
+
 		totalCost += levelValue
-		amount += ask.Amount
+
+		totalQty += ask.Qty
+
 		remaining -= levelValue
 	}
 
-	if amount == 0 {
+	// -------------------------
+	// NO FILL
+	// -------------------------
+
+	if totalQty <= 0 {
+
 		return 0, 0
 	}
 
-	return totalCost / amount, amount
+	avgPrice :=
+		totalCost / totalQty
+
+	return avgPrice, totalQty
 }
 
-func simulateSell(bids []feed.Level, amount float64) float64 {
-	remaining := amount
+// -----------------------------------
+// SIMULATE SELL
+// -----------------------------------
+
+func simulateSell(
+	bids []feed.Level,
+	amount float64,
+) float64 {
+
+	remaining :=
+		amount
+
 	totalReturn := 0.0
-	filled := 0.0
+
+	totalFilled := 0.0
 
 	for _, bid := range bids {
-		if remaining <= bid.Amount {
-			totalReturn += remaining * bid.Price
-			filled += remaining
+
+		// -------------------------
+		// VALIDATION
+		// -------------------------
+
+		if bid.Price <= 0 ||
+			bid.Qty <= 0 {
+
+			continue
+		}
+
+		// -------------------------
+		// PARTIAL FILL
+		// -------------------------
+
+		if remaining <= bid.Qty {
+
+			totalReturn +=
+				remaining * bid.Price
+
+			totalFilled += remaining
+
+			remaining = 0
+
 			break
 		}
 
-		totalReturn += bid.Amount * bid.Price
-		filled += bid.Amount
-		remaining -= bid.Amount
+		// -------------------------
+		// FULL LEVEL
+		// -------------------------
+
+		totalReturn +=
+			bid.Qty * bid.Price
+
+		totalFilled += bid.Qty
+
+		remaining -= bid.Qty
 	}
 
-	if filled == 0 {
+	// -------------------------
+	// NO FILL
+	// -------------------------
+
+	if totalFilled <= 0 {
+
 		return 0
 	}
 
-	return totalReturn / filled
+	avgSell :=
+		totalReturn / totalFilled
+
+	return avgSell
 }

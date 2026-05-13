@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto-arbitrage/internal/auth"
 	"crypto-arbitrage/internal/events"
 	"log"
 )
@@ -60,21 +59,11 @@ func StartEventConsumer(
 					// LOAD USERS
 					// -----------------------------------
 
-					users, err :=
-						auth.GetAllUsers()
-
-					if err != nil {
-
-						log.Println(
-							"[EVENT] failed loading users:",
-							err,
-						)
-
-						continue
-					}
+					users :=
+						GetCachedUsers()
 
 					log.Printf(
-						"[EVENT] users loaded: %d",
+						"[EVENT] cached users: %d",
 						len(users),
 					)
 

@@ -1,8 +1,9 @@
 package exchange
 
 import (
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/metrics"
 	"encoding/json"
 	"log"
 	"strings"
@@ -13,38 +14,29 @@ import (
 
 type BybitWS struct {
 	conn *websocket.Conn
-
-	symbols []string
 }
 
-// -----------------------------------
-// NAME
-// -----------------------------------
+var bybitKafkaProducer = kafka.NewProducer(
+	"localhost:9092",
+)
 
 func (b *BybitWS) Name() string {
 	return "BYBIT"
 }
 
-// -----------------------------------
-// CONNECT
-// -----------------------------------
-
 func (b *BybitWS) Connect(
 	symbols []string,
 ) error {
 
-	b.symbols = symbols
-
-	wsURL :=
-		"wss://stream.bybit.com/v5/public/spot"
+	url := "wss://stream.bybit.com/v5/public/spot"
 
 	log.Println(
 		"[BYBIT WS] connecting:",
-		wsURL,
+		url,
 	)
 
 	conn, _, err := websocket.DefaultDialer.Dial(
-		wsURL,
+		url,
 		nil,
 	)
 
@@ -58,57 +50,30 @@ func (b *BybitWS) Connect(
 		"[BYBIT WS] connected",
 	)
 
-	return nil
-}
+	args := []string{}
 
-// -----------------------------------
-// SUBSCRIBE
-// -----------------------------------
-
-func (b *BybitWS) Subscribe() error {
-
-	var args []string
-
-	for _, s := range b.symbols {
+	for _, symbol := range symbols {
 
 		args = append(
-			args,
-			"orderbook.1."+strings.ToUpper(s),
+			args, "orderbook.1."+strings.ToUpper(symbol),
 		)
 	}
 
-	payload := map[string]interface{}{
+	sub := map[string]interface{}{
 		"op":   "subscribe",
 		"args": args,
 	}
 
-	err := b.conn.WriteJSON(payload)
-
-	if err != nil {
-		return err
-	}
-
-	log.Printf(
-		"[BYBIT WS] subscribed: %v",
-		args,
-	)
-
-	return nil
+	return b.conn.WriteJSON(sub)
 }
 
-// -----------------------------------
-// READ LOOP
-// -----------------------------------
+func (b *BybitWS) Subscribe() error {
+	return nil
+}
 
 func (b *BybitWS) ReadLoop() error {
 
 	for {
-
-		b.conn.SetReadDeadline(
-			time.Now().Add(
-				30 * time.Second,
-			),
-		)
 
 		_, msg, err := b.conn.ReadMessage()
 
@@ -120,24 +85,21 @@ func (b *BybitWS) ReadLoop() error {
 			Topic string `json:"topic"`
 
 			Data struct {
-				Symbol string `json:"s"`
-
-				Bids [][]string `json:"b"`
-
-				Asks [][]string `json:"a"`
+				Symbol string     `json:"s"`
+				Bids   [][]string `json:"b"`
+				Asks   [][]string `json:"a"`
 			} `json:"data"`
 		}
 
-		err = json.Unmarshal(
-			msg,
-			&raw,
-		)
+		err = json.Unmarshal(msg, &raw)
 
 		if err != nil {
+
+			metrics.EngineErrors.Inc()
 			continue
 		}
 
-		if raw.Topic == "" {
+		if raw.Data.Symbol == "" {
 			continue
 		}
 
@@ -145,75 +107,72 @@ func (b *BybitWS) ReadLoop() error {
 			Time: time.Now().UnixMilli(),
 		}
 
-		// -------------------------
-		// BIDS
-		// -------------------------
+		for _, bid := range raw.Data.Bids {
 
-		for _, b := range raw.Data.Bids {
-
-			price := parseFloat(b[0])
-
-			qty := parseFloat(b[1])
+			if len(bid) < 2 {
+				continue
+			}
 
 			ob.Bids = append(
 				ob.Bids,
 				feed.Level{
-					Price: price,
-					Qty:   qty,
+					Price: parseFloat(bid[0]),
+					Qty:   parseFloat(bid[1]),
 				},
 			)
 		}
 
-		// -------------------------
-		// ASKS
-		// -------------------------
+		for _, ask := range raw.Data.Asks {
 
-		for _, a := range raw.Data.Asks {
-
-			price := parseFloat(a[0])
-
-			qty := parseFloat(a[1])
+			if len(ask) < 2 {
+				continue
+			}
 
 			ob.Asks = append(
 				ob.Asks,
 				feed.Level{
-					Price: price,
-					Qty:   qty,
+					Price: parseFloat(ask[0]),
+					Qty:   parseFloat(ask[1]),
 				},
 			)
 		}
 
-		symbol :=
-			strings.ToUpper(
-				raw.Data.Symbol,
-			)
+		if len(ob.Bids) == 0 ||
+			len(ob.Asks) == 0 {
+			continue
+		}
 
 		feed.UpdateOrderBook(
 			"bybit",
-			symbol,
+			raw.Data.Symbol,
 			ob,
 		)
 
-		events.Bus <- events.Event{
+		log.Printf(
+			"📥 OB UPDATE: bybit %s",
+			raw.Data.Symbol,
+		)
 
-			Type: "ORDERBOOK",
-
-			Data: events.OrderBookEvent{
-
-				Exchange: "bybit",
-
-				Symbol: symbol,
-
-				OrderBook: ob,
+		err = bybitKafkaProducer.Publish(
+			kafka.OrderBookMessage{
+				Exchange: "bybit", Symbol: raw.Data.Symbol,
+				Bids: ob.Bids,
+				Asks: ob.Asks,
+				Ts:   ob.Time,
 			},
+		)
+
+		if err != nil {
+
+			metrics.EngineErrors.Inc()
+
+			log.Println(
+				"[KAFKA] publish failed:",
+				err,
+			)
 		}
 	}
 }
-
-// -----------------------------------
-// CLOSE
-// -----------------------------------
-
 func (b *BybitWS) Close() error {
 
 	if b.conn != nil {

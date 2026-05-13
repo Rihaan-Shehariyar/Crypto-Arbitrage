@@ -1,8 +1,8 @@
 package exchange
 
 import (
-	"crypto-arbitrage/internal/events"
 	"crypto-arbitrage/internal/feed"
+	"crypto-arbitrage/internal/kafka"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -16,6 +16,14 @@ import (
 type BinanceWS struct {
 	conn *websocket.Conn
 }
+
+// -----------------------------------
+// KAFKA
+// -----------------------------------
+
+var kafkaProducer = kafka.NewProducer(
+	"localhost:9092",
+)
 
 // -----------------------------------
 // NAME
@@ -80,9 +88,6 @@ func (b *BinanceWS) Connect(
 // SUBSCRIBE
 // -----------------------------------
 
-// Binance combined stream already
-// subscribes through URL.
-
 func (b *BinanceWS) Subscribe() error {
 	return nil
 }
@@ -95,19 +100,11 @@ func (b *BinanceWS) ReadLoop() error {
 
 	for {
 
-		// -----------------------------------
-		// READ DEADLINE
-		// -----------------------------------
-
 		b.conn.SetReadDeadline(
 			time.Now().Add(
 				30 * time.Second,
 			),
 		)
-
-		// -----------------------------------
-		// READ MESSAGE
-		// -----------------------------------
 
 		_, msg, err :=
 			b.conn.ReadMessage()
@@ -116,19 +113,12 @@ func (b *BinanceWS) ReadLoop() error {
 			return err
 		}
 
-		// -----------------------------------
-		// RAW PAYLOAD
-		// -----------------------------------
-
 		var raw struct {
 			Stream string `json:"stream"`
 
 			Data struct {
-				Symbol string `json:"s"`
-
-				Bids [][]string `json:"b"`
-
-				Asks [][]string `json:"a"`
+				Bids [][]string `json:"bids"`
+				Asks [][]string `json:"asks"`
 			} `json:"data"`
 		}
 
@@ -140,16 +130,12 @@ func (b *BinanceWS) ReadLoop() error {
 		if err != nil {
 
 			log.Println(
-				"[BINANCE WS] unmarshal failed:",
+				"[BINANCE] unmarshal failed:",
 				err,
 			)
 
 			continue
 		}
-
-		// -----------------------------------
-		// VALIDATE STREAM
-		// -----------------------------------
 
 		if !strings.Contains(
 			raw.Stream,
@@ -158,32 +144,24 @@ func (b *BinanceWS) ReadLoop() error {
 			continue
 		}
 
-		// -----------------------------------
-		// SYMBOL
-		// -----------------------------------
+		parts := strings.Split(
+			raw.Stream,
+			"@",
+		)
 
-		symbol :=
-			strings.ToUpper(
-				raw.Data.Symbol,
-			)
-
-		if symbol == "" {
+		if len(parts) == 0 {
 			continue
 		}
 
-		// -----------------------------------
-		// EMPTY BOOK CHECK
-		// -----------------------------------
+		symbol := strings.ToUpper(
+			parts[0],
+		)
 
 		if len(raw.Data.Bids) == 0 ||
 			len(raw.Data.Asks) == 0 {
 
 			continue
 		}
-
-		// -----------------------------------
-		// ORDERBOOK
-		// -----------------------------------
 
 		ob := feed.OrderBook{
 			Time: time.Now().UnixMilli(),
@@ -193,18 +171,18 @@ func (b *BinanceWS) ReadLoop() error {
 		// BIDS
 		// -----------------------------------
 
-		for _, b := range raw.Data.Bids {
+		for _, bid := range raw.Data.Bids {
 
-			if len(b) < 2 {
+			if len(bid) < 2 {
 				continue
 			}
 
 			price := parseFloat(
-				b[0],
+				bid[0],
 			)
 
 			qty := parseFloat(
-				b[1],
+				bid[1],
 			)
 
 			if price <= 0 ||
@@ -216,10 +194,8 @@ func (b *BinanceWS) ReadLoop() error {
 			ob.Bids = append(
 				ob.Bids,
 				feed.Level{
-
 					Price: price,
-
-					Qty: qty,
+					Qty:   qty,
 				},
 			)
 		}
@@ -228,18 +204,18 @@ func (b *BinanceWS) ReadLoop() error {
 		// ASKS
 		// -----------------------------------
 
-		for _, a := range raw.Data.Asks {
+		for _, ask := range raw.Data.Asks {
 
-			if len(a) < 2 {
+			if len(ask) < 2 {
 				continue
 			}
 
 			price := parseFloat(
-				a[0],
+				ask[0],
 			)
 
 			qty := parseFloat(
-				a[1],
+				ask[1],
 			)
 
 			if price <= 0 ||
@@ -251,17 +227,11 @@ func (b *BinanceWS) ReadLoop() error {
 			ob.Asks = append(
 				ob.Asks,
 				feed.Level{
-
 					Price: price,
-
-					Qty: qty,
+					Qty:   qty,
 				},
 			)
 		}
-
-		// -----------------------------------
-		// FINAL VALIDATION
-		// -----------------------------------
 
 		if len(ob.Bids) == 0 ||
 			len(ob.Asks) == 0 {
@@ -285,22 +255,35 @@ func (b *BinanceWS) ReadLoop() error {
 		)
 
 		// -----------------------------------
-		// PUBLISH EVENT
+		// KAFKA PUBLISH
 		// -----------------------------------
 
-		events.Bus <- events.Event{
+		// Binance exchange Kafka publish section ONLY
 
-			Type: "ORDERBOOK",
-
-			Data: events.OrderBookEvent{
-
+		err = kafkaProducer.Publish(
+			kafka.OrderBookMessage{
 				Exchange: "binance",
-
-				Symbol: symbol,
-
-				OrderBook: ob,
+				Symbol:   symbol,
+				Bids:     ob.Bids,
+				Asks:     ob.Asks,
+				Ts:       time.Now().UnixMilli(),
 			},
+		)
+
+		if err != nil {
+
+			log.Println(
+				"[KAFKA] publish failed:",
+				err,
+			)
+
+			continue
 		}
+
+		log.Printf(
+			"[KAFKA] published %s",
+			symbol,
+		)
 	}
 }
 
