@@ -6,6 +6,7 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/kafka"
 	"crypto-arbitrage/internal/metrics"
+	"crypto-arbitrage/internal/pipeline"
 	"encoding/json"
 	"log"
 	"strings"
@@ -192,6 +193,11 @@ func (o *OKXWS) ReadLoop() error {
 			ob,
 		)
 
+		pipeline.PublishOrderBook(
+			"okx",
+			symbol,
+			ob,
+		)
 		log.Printf(
 			"📥 OB UPDATE: okx %s",
 			symbol,
@@ -208,7 +214,7 @@ func (o *OKXWS) ReadLoop() error {
 			},
 		)
 
-		if err != nil {
+		if err != nil {	
 
 			metrics.EngineErrors.Inc()
 
@@ -220,10 +226,10 @@ func (o *OKXWS) ReadLoop() error {
 			continue
 		}
 
-		log.Printf(
-			"[KAFKA] published okx %s",
-			symbol,
-		)
+		// log.Printf(
+		// 	"[KAFKA] published okx %s",
+		// 	symbol,
+		// )
 	}
 }
 

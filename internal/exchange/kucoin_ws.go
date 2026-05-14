@@ -5,6 +5,7 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/kafka"
 	"crypto-arbitrage/internal/metrics"
+	"crypto-arbitrage/internal/pipeline"
 	"encoding/json"
 	"io"
 	"log"
@@ -347,7 +348,11 @@ func (k *KucoinWS) ReadLoop() error {
 			symbol,
 			ob,
 		)
-
+		pipeline.PublishOrderBook(
+			"kucoin",
+			symbol,
+			ob,
+		)
 		// -----------------------------------
 		// METRICS
 		// -----------------------------------
@@ -384,10 +389,10 @@ func (k *KucoinWS) ReadLoop() error {
 			continue
 		}
 
-		log.Printf(
-			"[KAFKA] published kucoin %s",
-			symbol,
-		)
+		// log.Printf(
+		// 	"[KAFKA] published kucoin %s",
+		// 	symbol,
+		// )
 	}
 }
 

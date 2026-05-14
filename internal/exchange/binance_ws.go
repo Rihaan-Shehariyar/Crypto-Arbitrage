@@ -3,6 +3,7 @@ package exchange
 import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/pipeline"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -253,6 +254,12 @@ func (b *BinanceWS) ReadLoop() error {
 			ob,
 		)
 
+		pipeline.PublishOrderBook(
+			"binance",
+			symbol,
+			ob,
+		)
+
 		log.Printf(
 			"📥 OB UPDATE: binance %s",
 			symbol,
@@ -277,18 +284,18 @@ func (b *BinanceWS) ReadLoop() error {
 
 		if err != nil {
 
-			log.Println(
-				"[KAFKA] publish failed:",
-				err,
-			)
+			// log.Println(
+			// 	"[KAFKA] publish failed:",
+			// 	err,
+			// )
 
 			continue
 		}
 
-		log.Printf(
-			"[KAFKA] published %s",
-			symbol,
-		)
+		// log.Printf(
+		// 	"[KAFKA] published %s",
+		// 	symbol,
+		// )
 	}
 }
 

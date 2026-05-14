@@ -4,6 +4,7 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/kafka"
 	"crypto-arbitrage/internal/metrics"
+	"crypto-arbitrage/internal/pipeline"
 	"encoding/json"
 	"log"
 	"strings"
@@ -285,6 +286,11 @@ func (g *GateWS) ReadLoop() error {
 			symbol,
 			ob,
 		)
+		pipeline.PublishOrderBook(
+			"gate",
+			symbol,
+			ob,
+		)
 
 		// -----------------------------------
 		// METRICS
@@ -322,10 +328,10 @@ func (g *GateWS) ReadLoop() error {
 			continue
 		}
 
-		log.Printf(
-			"[KAFKA] published gate %s",
-			symbol,
-		)
+		// log.Printf(
+		// 	"[KAFKA] published gate %s",
+		// 	symbol,
+		// )
 	}
 }
 

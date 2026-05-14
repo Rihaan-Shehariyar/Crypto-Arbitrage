@@ -1,4 +1,3 @@
-// internal/kafka/consumer.go
 
 package kafka
 
@@ -37,9 +36,9 @@ func NewConsumer(
 
 func (c *Consumer) Start() {
 
-	log.Println(
-		"[KAFKA] consumer started",
-	)
+	// log.Println(
+	// 	"[KAFKA] consumer started",
+	// )
 
 	for {
 
@@ -75,11 +74,11 @@ func (c *Consumer) Start() {
 			continue
 		}
 
-		log.Printf(
-			"[KAFKA] RECEIVED %s %s",
-			obMsg.Exchange,
-			obMsg.Symbol,
-		)
+		// log.Printf(
+		// 	"[KAFKA] RECEIVED %s %s",
+		// 	obMsg.Exchange,
+		// 	obMsg.Symbol,
+		// )
 
 		metrics.KafkaMessages.Inc()
 

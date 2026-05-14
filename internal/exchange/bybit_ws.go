@@ -4,6 +4,7 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/kafka"
 	"crypto-arbitrage/internal/metrics"
+	"crypto-arbitrage/internal/pipeline"
 	"encoding/json"
 	"log"
 	"strings"
@@ -147,6 +148,11 @@ func (b *BybitWS) ReadLoop() error {
 		}
 
 		feed.UpdateOrderBook(
+			"bybit",
+			raw.Data.Symbol,
+			ob,
+		)
+		pipeline.PublishOrderBook(
 			"bybit",
 			raw.Data.Symbol,
 			ob,

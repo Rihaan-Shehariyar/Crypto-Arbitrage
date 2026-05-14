@@ -210,6 +210,7 @@ func main() {
 	service.StartCrossWorkers(10)
 
 	service.StartEventConsumer(ctx)
+	service.StartExchangeHealthMonitor()
 
 	// -----------------------------------
 	// BALANCE WORKER

@@ -42,14 +42,12 @@ type OrderBook struct {
 var (
 
 	// symbol -> exchange -> orderbook
-	orderBooks =
-		make(
-			map[string]map[string]OrderBook,
-		)
+	orderBooks = make(
+		map[string]map[string]OrderBook,
+	)
 
 	// throttled logs
-	lastLog =
-		make(map[string]int64)
+	lastLog = make(map[string]int64)
 
 	obMutex sync.RWMutex
 )
@@ -94,6 +92,10 @@ func UpdateOrderBook(
 	metrics.ExchangeUpdates.
 		WithLabelValues(exchange).
 		Inc()
+
+	metrics.UpdateExchangeHeartbeat(
+		exchange,
+	)
 
 	// -----------------------------------
 	// THROTTLED LOGGING
@@ -143,8 +145,7 @@ func GetOrderBooks(
 		return result
 	}
 
-	for exchange, ob :=
-		range books {
+	for exchange, ob := range books {
 
 		result[exchange] = ob
 	}
@@ -189,8 +190,7 @@ func TotalBooks() int {
 
 	total := 0
 
-	for _, books :=
-		range orderBooks {
+	for _, books := range orderBooks {
 
 		total += len(books)
 	}
