@@ -2,6 +2,8 @@ package inventory
 
 func HasInventory(
 
+	userID string,
+
 	buyExchange string,
 	sellExchange string,
 
@@ -12,11 +14,8 @@ func HasInventory(
 	baseQty float64,
 ) bool {
 
-	// -------------------------
-	// BUY SIDE NEEDS USDT
-	// -------------------------
-
 	buyUSDT := GetInventory(
+		userID,
 		buyExchange,
 		"USDT",
 	)
@@ -25,13 +24,9 @@ func HasInventory(
 		return false
 	}
 
-	// -------------------------
-	// SELL SIDE NEEDS ASSET
-	// -------------------------
-
 	sellAsset := GetInventory(
-		sellExchange,
-		baseAsset,
+		userID,
+		sellExchange, baseAsset,
 	)
 
 	if sellAsset < baseQty {

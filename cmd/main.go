@@ -8,6 +8,7 @@ import (
 	"crypto-arbitrage/internal/exchange"
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/handler"
+	"crypto-arbitrage/internal/inventory"
 	"crypto-arbitrage/internal/kafka"
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
@@ -40,9 +41,17 @@ func main() {
 
 	db.Connect()
 
+	err := inventory.LoadInventories()
+
+	if err != nil {
+
+		log.Fatal(err)
+	}
+
 	db.DB.AutoMigrate(
 		&paper.Trade{},
 		&auth.User{},
+		&inventory.Inventory{},
 	)
 
 	// -----------------------------------
@@ -279,8 +288,12 @@ func main() {
 	)
 
 	authGroup.GET(
+		"/inventory",
+		handler.InventoryHandler,
+	)
+	authGroup.GET(
 		"/trades",
-		handler.GetTrades,
+		handler.TradesHandler,
 	)
 
 	authGroup.GET(
@@ -297,6 +310,8 @@ func main() {
 		"/exchange-keys",
 		handler.GetExchangeKeysHandler,
 	)
+
+	authGroup.POST("/deposit", handler.DepositHandler)
 
 	// -----------------------------------
 	// ADMIN ROUTES

@@ -2,19 +2,24 @@ package handler
 
 import (
 	"crypto-arbitrage/internal/auth"
-	"crypto-arbitrage/internal/db"
-	"crypto-arbitrage/internal/paper"
+	"crypto-arbitrage/internal/inventory"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func TradesHandler(
+type DepositRequest struct {
+	Exchange string  `json:"exchange"`
+	Asset    string  `json:"asset"`
+	Amount   float64 `json:"amount"`
+}
+
+func DepositHandler(
 	c *gin.Context,
 ) {
 
 	// -----------------------------------
-	// AUTH USER
+	// GET AUTH USER
 	// -----------------------------------
 
 	userValue, exists :=
@@ -36,23 +41,15 @@ func TradesHandler(
 		userValue.(auth.User)
 
 	// -----------------------------------
-	// FETCH TRADES
+	// REQUEST
 	// -----------------------------------
 
-	var trades []paper.Trade
+	var req DepositRequest
 
-	err := db.DB.
-		Where(
-			"user_id = ?",
-			user.ID,
-		).
-		Order("created_at DESC").
-		Find(&trades).Error
-
-	if err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 
 		c.JSON(
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			gin.H{
 				"error": err.Error(),
 			},
@@ -62,11 +59,24 @@ func TradesHandler(
 	}
 
 	// -----------------------------------
+	// UPDATE INVENTORY
+	// -----------------------------------
+
+	inventory.AddInventory(
+		user.ID,
+		req.Exchange,
+		req.Asset,
+		req.Amount,
+	)
+
+	// -----------------------------------
 	// RESPONSE
 	// -----------------------------------
 
 	c.JSON(
 		http.StatusOK,
-		trades,
+		gin.H{
+			"message": "deposit successful",
+		},
 	)
 }

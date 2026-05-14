@@ -1,89 +1,89 @@
 package inventory
 
-import "sync"
+// import "sync"
 
-var invMu sync.RWMutex
+// var invMu sync.RWMutex
 
-// -----------------------------------
-// exchange -> asset -> amount
-// -----------------------------------
+// // -----------------------------------
+// // exchange -> asset -> amount
+// // -----------------------------------
 
-var inventory = make(map[string]map[string]float64)
+// var inventory = make(map[string]map[string]float64)
 
-// -----------------------------------
-// FULL INVENTORY UPDATE
-// -----------------------------------
+// // -----------------------------------
+// // FULL INVENTORY UPDATE
+// // -----------------------------------
 
-func UpdateInventory(
-	exchange string,
-	bal map[string]float64,
-) {
+// func UpdateInventory(
+// 	exchange string,
+// 	bal map[string]float64,
+// ) {
 
-	invMu.Lock()
-	defer invMu.Unlock()
+// 	invMu.Lock()
+// 	defer invMu.Unlock()
 
-	inventory[exchange] = bal
-}
+// 	inventory[exchange] = bal
+// }
 
-// -----------------------------------
-// GET INVENTORY
-// -----------------------------------
+// // -----------------------------------
+// // GET INVENTORY
+// // -----------------------------------
 
-func GetInventory(
-	exchange string,
-	asset string,
-) float64 {
+// func GetInventory(
+// 	exchange string,
+// 	asset string,
+// ) float64 {
 
-	invMu.RLock()
-	defer invMu.RUnlock()
+// 	invMu.RLock()
+// 	defer invMu.RUnlock()
 
-	if inventory[exchange] == nil {
-		return 0
-	}
+// 	if inventory[exchange] == nil {
+// 		return 0
+// 	}
 
-	return inventory[exchange][asset]
-}
+// 	return inventory[exchange][asset]
+// }
 
-// -----------------------------------
-// ADD INVENTORY
-// -----------------------------------
+// // -----------------------------------
+// // ADD INVENTORY
+// // -----------------------------------
 
-func AddInventory(
-	exchange string,
-	asset string,
-	amount float64,
-) {
+// func AddInventory(
+// 	exchange string,
+// 	asset string,
+// 	amount float64,
+// ) {
 
-	invMu.Lock()
-	defer invMu.Unlock()
+// 	invMu.Lock()
+// 	defer invMu.Unlock()
 
-	if inventory[exchange] == nil {
+// 	if inventory[exchange] == nil {
 
-		inventory[exchange] =
-			make(map[string]float64)
-	}
+// 		inventory[exchange] =
+// 			make(map[string]float64)
+// 	}
 
-	inventory[exchange][asset] += amount
-}
+// 	inventory[exchange][asset] += amount
+// }
 
-// -----------------------------------
-// SUB INVENTORY
-// -----------------------------------
+// // -----------------------------------
+// // SUB INVENTORY
+// // -----------------------------------
 
-func SubInventory(
-	exchange string,
-	asset string,
-	amount float64,
-) {
+// func SubInventory(
+// 	exchange string,
+// 	asset string,
+// 	amount float64,
+// ) {
 
-	invMu.Lock()
-	defer invMu.Unlock()
+// 	invMu.Lock()
+// 	defer invMu.Unlock()
 
-	if inventory[exchange] == nil {
+// 	if inventory[exchange] == nil {
 
-		inventory[exchange] =
-			make(map[string]float64)
-	}
+// 		inventory[exchange] =
+// 			make(map[string]float64)
+// 	}
 
-	inventory[exchange][asset] -= amount
-}
+// 	inventory[exchange][asset] -= amount
+// }
