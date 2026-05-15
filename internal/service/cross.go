@@ -375,8 +375,9 @@ func handleCross(
 					qty*avgSell,
 				)
 
-				websocket.Broadcast(
+				websocket.BroadcastToUser(
 					"PORTFOLIO_UPDATED",
+					userID,
 					map[string]interface{}{
 						"user_id": userID,
 					},
@@ -450,8 +451,9 @@ func handleCross(
 					},
 				)
 
-				websocket.Broadcast(
+				websocket.BroadcastToUser(
 					"TRADE_EXECUTED",
+					userID,
 					map[string]interface{}{
 
 						"id": tradeID,

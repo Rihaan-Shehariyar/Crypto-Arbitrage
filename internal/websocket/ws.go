@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 
@@ -13,39 +14,102 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// -----------------------------------
+// GLOBAL CLIENTS
+// -----------------------------------
+
 var (
-	Clients = make(map[*websocket.Conn]bool)
-	mu      sync.Mutex
+	Clients = make(map[*Client]bool)
+
+	mu sync.RWMutex
 )
 
-func Upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
-	return upgrader.Upgrade(w, r, nil)
+// -----------------------------------
+// UPGRADE
+// -----------------------------------
+
+func Upgrade(
+	w http.ResponseWriter,
+	r *http.Request,
+) (*websocket.Conn, error) {
+
+	return upgrader.Upgrade(
+		w,
+		r,
+		nil,
+	)
 }
 
-func AddClient(conn *websocket.Conn) {
+// -----------------------------------
+// ADD CLIENT
+// -----------------------------------
+
+func AddClient(
+
+	conn *websocket.Conn,
+
+	userID string,
+) {
+
+	client := &Client{
+
+		Conn: conn,
+
+		Send: make(chan []byte, 256),
+
+		UserID: userID,
+	}
+
 	mu.Lock()
-	Clients[conn] = true
+
+	Clients[client] = true
+
 	mu.Unlock()
 
-	// Listen for disconnect
+	// -----------------------------------
+	// WRITE LOOP
+	// -----------------------------------
+
+	go client.WritePump()
+
+	// -----------------------------------
+	// READ LOOP
+	// -----------------------------------
+
 	go func() {
+
 		defer func() {
+
 			mu.Lock()
-			delete(Clients, conn)
+
+			delete(Clients, client)
+
 			mu.Unlock()
+
+			close(client.Send)
+
 			conn.Close()
 		}()
 
 		for {
+
 			_, _, err := conn.ReadMessage()
+
 			if err != nil {
 				return
 			}
 		}
 	}()
 }
+
+// -----------------------------------
+// GLOBAL BROADCAST
+// -----------------------------------
+
 func Broadcast(
+
 	eventType string,
+
 	payload interface{},
 ) {
 
@@ -56,35 +120,70 @@ func Broadcast(
 		Payload: payload,
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	data, err :=
+		json.Marshal(message)
+
+	if err != nil {
+		return
+	}
+
+	mu.RLock()
+	defer mu.RUnlock()
 
 	for client := range Clients {
 
-		err := client.WriteJSON(message)
+		select {
 
-		if err != nil {
+		// -----------------------------------
+		// NON-BLOCKING SEND
+		// -----------------------------------
 
-			client.Close()
+		case client.Send <- data:
+
+		// -----------------------------------
+		// CLIENT TOO SLOW
+		// -----------------------------------
+
+		default:
+
+			close(client.Send)
 
 			delete(Clients, client)
+
+			client.Conn.Close()
 		}
 	}
 }
 
+
+
+// -----------------------------------
+// CLIENT COUNT
+// -----------------------------------
+
+func ClientCount() int {
+
+	mu.RLock()
+	defer mu.RUnlock()
+
+	return len(Clients)
+}
+
+// -----------------------------------
+// CLOSE ALL
+// -----------------------------------
+
 func CloseAll() {
+
 	mu.Lock()
 	defer mu.Unlock()
 
 	for client := range Clients {
-		client.Close()
+
+		close(client.Send)
+
+		client.Conn.Close()
+
 		delete(Clients, client)
 	}
-}
-func ClientCount() int {
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	return len(Clients)
 }
