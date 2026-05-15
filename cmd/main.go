@@ -312,6 +312,7 @@ func main() {
 	)
 
 	authGroup.POST("/deposit", handler.DepositHandler)
+	authGroup.GET("/portfolio", handler.PortfolioHandler)
 
 	// -----------------------------------
 	// ADMIN ROUTES
