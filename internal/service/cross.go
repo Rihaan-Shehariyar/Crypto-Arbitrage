@@ -4,7 +4,10 @@ import (
 	"crypto-arbitrage/internal/feed"
 	"crypto-arbitrage/internal/inventory"
 	"crypto-arbitrage/internal/metrics"
+	"crypto-arbitrage/internal/opportunity"
 	"crypto-arbitrage/internal/paper"
+	"crypto-arbitrage/internal/risk"
+	"crypto-arbitrage/internal/websocket"
 	"log"
 	"strings"
 	"sync"
@@ -211,6 +214,48 @@ func handleCross(
 
 			metrics.ProfitableSpreads.Inc()
 
+			go opportunity.Save(
+				opportunity.Opportunity{
+
+					UserID: userID,
+
+					Symbol: symbol,
+
+					BuyExchange: buyEx,
+
+					SellExchange: sellEx,
+
+					BuyPrice: avgBuy,
+
+					SellPrice: avgSell,
+
+					SpreadPercent: netSpread,
+
+					EstimatedProfit: (avgSell - avgBuy) * qty,
+
+					LatencyMs: 0,
+				},
+			)
+
+			websocket.Broadcast(
+				"OPPORTUNITY_FOUND",
+				map[string]interface{}{
+					"symbol": symbol,
+
+					"buy_exchange": buyEx,
+
+					"sell_exchange": sellEx,
+
+					"spread_percent": netSpread,
+
+					"buy_price": avgBuy,
+
+					"sell_price": avgSell,
+
+					"timestamp": time.Now().UnixMilli(),
+				},
+			)
+
 			userMetrics :=
 				metrics.GetUserMetrics(userID)
 
@@ -227,13 +272,25 @@ func handleCross(
 				continue
 			}
 
+			if !risk.AllowTrade(
+
+				userID,
+
+				tradeValue,
+
+				netSpread,
+			) {
+
+				continue
+			}
+
 			opportunityCount++
 
 			tradeID :=
 				uuid.NewString()
 
 			log.Printf(
-				"⚡ ARB %s | USER %s | BUY %s → SELL %s | NET %.4f%%",
+				"ARB %s | USER %s | BUY %s → SELL %s | NET %.4f%%",
 				symbol,
 				userID,
 				buyEx,
@@ -244,7 +301,10 @@ func handleCross(
 			// -----------------------------------
 			// EXECUTION
 			// -----------------------------------
-
+			risk.OpenTrade(
+				userID,
+				tradeValue,
+			)
 			go func(
 				tradeID string,
 				symbol string,
@@ -316,6 +376,13 @@ func handleCross(
 					qty*avgSell,
 				)
 
+				websocket.Broadcast(
+					"PORTFOLIO_UPDATED",
+					map[string]interface{}{
+						"user_id": userID,
+					},
+				)
+
 				// -----------------------------------
 				// PROFIT
 				// -----------------------------------
@@ -328,6 +395,13 @@ func handleCross(
 
 				duration :=
 					time.Since(start)
+
+
+				risk.CloseTrade(
+					userID,
+					tradeValue,
+					profitUSDT,
+				)
 
 				// -----------------------------------
 				// USER METRICS
@@ -378,6 +452,30 @@ func handleCross(
 					},
 				)
 
+				websocket.Broadcast(
+					"TRADE_EXECUTED",
+					map[string]interface{}{
+
+						"id": tradeID,
+
+						"user_id": userID,
+
+						"symbol": symbol,
+
+						"buy_exchange": buyEx,
+
+						"sell_exchange": sellEx,
+
+						"profit_usdt": profitUSDT,
+
+						"profit_percent": profitPercent,
+
+						"latency_ms": duration.Milliseconds(),
+
+						"timestamp": time.Now().UnixMilli(),
+					},
+				)
+
 				log.Printf(
 					"✅ TRADE CLOSED | USER %s | %s | %.4f USDT (%.4f%%)",
 					userID,
@@ -397,6 +495,7 @@ func handleCross(
 				qty,
 				tradeValue,
 			)
+
 		}
 	}
 }

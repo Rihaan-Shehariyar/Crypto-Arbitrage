@@ -10,6 +10,7 @@ import (
 	"crypto-arbitrage/internal/handler"
 	"crypto-arbitrage/internal/inventory"
 	"crypto-arbitrage/internal/kafka"
+	"crypto-arbitrage/internal/opportunity"
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
 	"crypto-arbitrage/internal/service"
@@ -52,6 +53,7 @@ func main() {
 		&paper.Trade{},
 		&auth.User{},
 		&inventory.Inventory{},
+		&opportunity.Opportunity{},
 	)
 
 	// -----------------------------------
@@ -313,6 +315,8 @@ func main() {
 
 	authGroup.POST("/deposit", handler.DepositHandler)
 	authGroup.GET("/portfolio", handler.PortfolioHandler)
+	authGroup.GET("/opportunities", handler.OpportunitiesHandler)
+	authGroup.GET("/analytics", handler.AnalyticsHandler)
 
 	// -----------------------------------
 	// ADMIN ROUTES

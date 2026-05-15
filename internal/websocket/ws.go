@@ -44,15 +44,29 @@ func AddClient(conn *websocket.Conn) {
 		}
 	}()
 }
+func Broadcast(
+	eventType string,
+	payload interface{},
+) {
 
-func Broadcast(data interface{}) {
+	message := Message{
+
+		Type: eventType,
+
+		Payload: payload,
+	}
+
 	mu.Lock()
 	defer mu.Unlock()
 
 	for client := range Clients {
-		err := client.WriteJSON(data)
+
+		err := client.WriteJSON(message)
+
 		if err != nil {
+
 			client.Close()
+
 			delete(Clients, client)
 		}
 	}
@@ -66,4 +80,11 @@ func CloseAll() {
 		client.Close()
 		delete(Clients, client)
 	}
+}
+func ClientCount() int {
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	return len(Clients)
 }
