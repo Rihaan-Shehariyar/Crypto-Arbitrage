@@ -72,8 +72,7 @@ func handleCross(
 	orderBooks :=
 		feed.GetOrderBooks(symbol)
 
-	if orderBooks == nil ||
-		len(orderBooks) < 2 {
+	if len(orderBooks) < 2 {
 
 		return
 	}
@@ -395,7 +394,6 @@ func handleCross(
 
 				duration :=
 					time.Since(start)
-
 
 				risk.CloseTrade(
 					userID,

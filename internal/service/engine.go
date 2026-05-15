@@ -112,8 +112,7 @@ func StartEngine(
 			orderBooks :=
 				feed.GetOrderBooks(symbol)
 
-			if orderBooks == nil ||
-				len(orderBooks) < 2 {
+			if len(orderBooks) < 2 {
 
 				continue
 			}
