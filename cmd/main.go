@@ -30,15 +30,11 @@ import (
 
 func main() {
 
-	// -----------------------------------
 	// ENV
-	// -----------------------------------
 
 	godotenv.Load()
 
-	// -----------------------------------
 	// DATABASE
-	// -----------------------------------
 
 	db.Connect()
 
@@ -56,15 +52,11 @@ func main() {
 		&opportunity.Opportunity{},
 	)
 
-	// -----------------------------------
 	// RECOVERY
-	// -----------------------------------
 
 	recovery.RecoverTrades()
 
-	// -----------------------------------
 	// CONTEXT
-	// -----------------------------------
 
 	ctx, cancel :=
 		context.WithCancel(
@@ -73,9 +65,7 @@ func main() {
 
 	defer cancel()
 
-	// -----------------------------------
 	// ENGINE CONFIG
-	// -----------------------------------
 
 	service.CurrentMode =
 		service.Cross
@@ -92,17 +82,13 @@ func main() {
 		service.Simulate,
 	)
 
-	// -----------------------------------
 	// FEED
-	// -----------------------------------
 
 	f := feed.NewFeed()
 
 	_ = f
 
-	// -----------------------------------
 	// KAFKA
-	// -----------------------------------
 
 	producer :=
 		kafka.NewProducer(
@@ -122,9 +108,7 @@ func main() {
 
 	_ = producer
 
-	// -----------------------------------
 	// EXCHANGES
-	// -----------------------------------
 
 	symbols := []string{
 		"BTCUSDT",
@@ -157,9 +141,7 @@ func main() {
 		symbols,
 	)
 
-	// -----------------------------------
 	// BROKERS
-	// -----------------------------------
 
 	binanceBroker :=
 		broker.NewBinance(
@@ -181,9 +163,7 @@ func main() {
 		"Brokers initialized",
 	)
 
-	// -----------------------------------
 	// TRIANGLES
-	// -----------------------------------
 
 	allSymbols, err :=
 		service.FetchBinanceSymbols()
@@ -200,9 +180,7 @@ func main() {
 		"Triangles initialized",
 	)
 
-	// -----------------------------------
 	// WAIT FOR MARKET DATA
-	// -----------------------------------
 
 	log.Println(
 		"Waiting for market data...",
@@ -212,9 +190,7 @@ func main() {
 		2 * time.Second,
 	)
 
-	// -----------------------------------
 	// EVENT CONSUMER
-	// -----------------------------------
 
 	service.StartUserCache()
 
@@ -223,17 +199,13 @@ func main() {
 	service.StartEventConsumer(ctx)
 	service.StartExchangeHealthMonitor()
 
-	// -----------------------------------
 	// BALANCE WORKER
-	// -----------------------------------
 
 	go service.StartBalanceWorker(
 		brokers,
 	)
 
-	// -----------------------------------
 	// API
-	// -----------------------------------
 
 	r := gin.Default()
 
@@ -241,9 +213,7 @@ func main() {
 		cors.Default(),
 	)
 
-	// -----------------------------------
 	// PUBLIC ROUTES
-	// -----------------------------------
 
 	r.GET(
 		"/metrics",
@@ -267,9 +237,7 @@ func main() {
 		handler.LoginHandler,
 	)
 
-	// -----------------------------------
 	// AUTH ROUTES
-	// -----------------------------------
 
 	authGroup := r.Group("/")
 
@@ -318,18 +286,14 @@ func main() {
 	authGroup.GET("/opportunities", handler.OpportunitiesHandler)
 	authGroup.GET("/analytics", handler.AnalyticsHandler)
 
-	// -----------------------------------
 	// ADMIN ROUTES
-	// -----------------------------------
 
 	r.GET(
 		"/admin/metrics",
 		handler.AdminMetricsHandler,
 	)
 
-	// -----------------------------------
 	// SERVER
-	// -----------------------------------
 
 	srv := &http.Server{
 
@@ -351,9 +315,7 @@ func main() {
 		}
 	}()
 
-	// -----------------------------------
 	// SHUTDOWN
-	// -----------------------------------
 
 	quit :=
 		make(chan os.Signal, 1)
