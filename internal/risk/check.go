@@ -64,5 +64,9 @@ func AllowTrade(
 		return false
 	}
 
+	// if spread < -0.05 {
+
+	// 	return false
+	// }
 	return true
 }

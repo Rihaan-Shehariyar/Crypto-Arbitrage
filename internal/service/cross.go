@@ -43,9 +43,9 @@ func unlock(key string) {
 // -----------------------------------
 
 const (
-	feeRate        = 0.001 // 0.1%
-	slippageBuffer = 0.05  // %
-	latencyBuffer  = 0.05  // %
+	feeRate        = 0.0002 // 0.001%
+	slippageBuffer = 0.01   // % 0.05
+	latencyBuffer  = 0.01   // % 0.05
 
 	minTradeValue = 10.0
 
@@ -186,7 +186,13 @@ func handleCross(
 			// PROFITABLE?
 			// -----------------------------------
 
-			if netSpread <= 0 {
+			if netSpread <= -0.05 {
+
+				log.Printf(
+					"❌ SPREAD FAIL %s | %.4f%%",
+					symbol,
+					netSpread,
+				)
 				continue
 			}
 
@@ -207,6 +213,12 @@ func handleCross(
 
 				qty,
 			) {
+				log.Printf(
+					"❌ INVENTORY FAIL %s | %s -> %s",
+					symbol,
+					buyEx,
+					sellEx,
+				)
 
 				continue
 			}
@@ -271,6 +283,22 @@ func handleCross(
 				continue
 			}
 
+			log.Printf(
+				"🔒 LOCK ACQUIRED %s",
+				symbol,
+			)
+
+			defer func() {
+
+				unlock(lockKey)
+
+				log.Printf(
+					"🔓 LOCK RELEASED %s",
+					symbol,
+				)
+
+			}()
+
 			if !risk.AllowTrade(
 
 				userID,
@@ -279,6 +307,10 @@ func handleCross(
 
 				netSpread,
 			) {
+				log.Printf(
+					"❌ RISK FAIL %s | %.4f%%",
+					symbol,
+					netSpread)
 
 				continue
 			}
