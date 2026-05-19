@@ -2,6 +2,7 @@ package opportunity
 
 import "time"
 
+
 type Opportunity struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	Symbol          string    `json:"symbol"`
