@@ -127,8 +127,8 @@ func Broadcast(
 		return
 	}
 
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
 
 	for client := range Clients {
 

@@ -91,9 +91,12 @@ func GetAllUsers() ([]User, error) {
 
 	var users []User
 
-	err := db.DB.Find(
-		&users,
-	).Error
+	err := db.DB.
+		Where(
+			"trading_enabled = ?",
+			true,
+		).
+		Find(&users).Error
 
 	return users, err
 }

@@ -17,7 +17,7 @@ var cachedUsers []auth.User
 
 func StartUserCache() {
 
-	refreshUsers()
+	RefreshUsers()
 
 	go func() {
 
@@ -30,7 +30,7 @@ func StartUserCache() {
 
 		for range ticker.C {
 
-			refreshUsers()
+			RefreshUsers()
 		}
 	}()
 }
@@ -39,7 +39,7 @@ func StartUserCache() {
 // REFRESH USERS
 // -----------------------------------
 
-func refreshUsers() {
+func RefreshUsers() {
 
 	users, err :=
 		auth.GetAllUsers()

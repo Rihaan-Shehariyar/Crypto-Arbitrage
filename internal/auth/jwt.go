@@ -8,7 +8,13 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+func getJWTKey() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return []byte("super-secret-key")
+	}
+	return []byte(secret)
+}
 
 func GenerateToken(userID string) (string, error) {
 
@@ -19,7 +25,7 @@ func GenerateToken(userID string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	return token.SignedString(jwtKey)
+	return token.SignedString(getJWTKey())
 
 }
 
@@ -33,7 +39,7 @@ func ValidateToken(tokenString string) (string, error) {
 			)
 		}
 
-		return jwtKey, nil
+		return getJWTKey(), nil
 	})
 
 	if err != nil || !token.Valid {

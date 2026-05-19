@@ -10,25 +10,20 @@ import (
 )
 
 type Trade struct {
-	ID     string `gorm:"primaryKey"`
-	Symbol string
-	UserID string
-
-	BuyExchange  string
-	SellExchange string
-
-	BuyPrice  float64
-	SellPrice float64
-
-	Quantity float64
-
-	ProfitUSDT    float64
-	ProfitPercent float64
-	LatencyMs     int64
-	Time          time.Time
-	Status        string
-
-	CreatedAt time.Time
+	ID            string    `gorm:"primaryKey" json:"id"`
+	Symbol        string    `json:"symbol"`
+	UserID        string    `json:"user_id"`
+	BuyExchange   string    `json:"buy_exchange"`
+	SellExchange  string    `json:"sell_exchange"`
+	BuyPrice      float64   `json:"buy_price"`
+	SellPrice     float64   `json:"sell_price"`
+	Quantity      float64   `json:"quantity"`
+	ProfitUSDT    float64   `json:"profit_usdt"`
+	ProfitPercent float64   `json:"profit_percent"`
+	LatencyMs     int64     `json:"latency_ms"`
+	Time          time.Time `json:"time"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 var Trades []Trade

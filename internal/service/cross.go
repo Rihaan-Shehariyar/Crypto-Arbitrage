@@ -186,7 +186,7 @@ func handleCross(
 			// PROFITABLE?
 			// -----------------------------------
 
-			if netSpread <= -0.05 {
+			if netSpread <= 0 {
 
 				log.Printf(
 					"❌ SPREAD FAIL %s | %.4f%%",
@@ -262,6 +262,10 @@ func handleCross(
 					"buy_price": avgBuy,
 
 					"sell_price": avgSell,
+
+					"estimated_profit": (avgSell - avgBuy) * qty,
+
+					"latency_ms": 12,
 
 					"timestamp": time.Now().UnixMilli(),
 				},
@@ -408,8 +412,8 @@ func handleCross(
 				)
 
 				websocket.BroadcastToUser(
-					"PORTFOLIO_UPDATED",
 					userID,
+					"PORTFOLIO_UPDATED",
 					map[string]interface{}{
 						"user_id": userID,
 					},
@@ -484,27 +488,20 @@ func handleCross(
 				)
 
 				websocket.BroadcastToUser(
-					"TRADE_EXECUTED",
 					userID,
+					"TRADE_EXECUTED",
 					map[string]interface{}{
 
-						"id": tradeID,
-
-						"user_id": userID,
-
-						"symbol": symbol,
-
-						"buy_exchange": buyEx,
-
-						"sell_exchange": sellEx,
-
-						"profit_usdt": profitUSDT,
-
+						"id":             tradeID,
+						"user_id":        userID,
+						"symbol":         symbol,
+						"buy_exchange":   buyEx,
+						"sell_exchange":  sellEx,
+						"profit_usdt":    profitUSDT,
 						"profit_percent": profitPercent,
-
-						"latency_ms": duration.Milliseconds(),
-
-						"timestamp": time.Now().UnixMilli(),
+						"latency_ms":     duration.Milliseconds(),
+						"status":         "CLOSED",
+						"created_at":     time.Now().Format(time.RFC3339),
 					},
 				)
 

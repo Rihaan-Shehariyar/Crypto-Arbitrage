@@ -7,5 +7,7 @@ type User struct {
 
 	Password string
 
+	TradingEnabled bool `gorm:"default:false"`
+
 	ExchangeKeys []ExchangeKey
 }
