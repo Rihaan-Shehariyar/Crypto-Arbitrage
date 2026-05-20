@@ -9,5 +9,7 @@ type User struct {
 
 	TradingEnabled bool `gorm:"default:false"`
 
+	SubscriptionActive bool `json:"subscription_active"`
+
 	ExchangeKeys []ExchangeKey
 }

@@ -292,6 +292,10 @@ func main() {
 		handler.StopTradingHandler,
 	)
 
+	authGroup.POST("/subscription/activate",
+		handler.ActivateSubscriptionHandler,
+	)
+
 	authGroup.POST("/deposit", handler.DepositHandler)
 	authGroup.GET("/portfolio", handler.PortfolioHandler)
 	authGroup.GET("/opportunities", handler.OpportunitiesHandler)

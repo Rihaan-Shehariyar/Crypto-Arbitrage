@@ -43,13 +43,12 @@ func unlock(key string) {
 // -----------------------------------
 
 const (
-	feeRate        = 0.0002 // 0.001%
-	slippageBuffer = 0.01   // % 0.05
-	latencyBuffer  = 0.01   // % 0.05
+	feeRate        = 0.001
+	slippageBuffer = 0.01
+	latencyBuffer  = 0.01
 
 	minTradeValue = 10.0
-
-	maxCapital = 50.0
+	maxCapital    = 50.0
 )
 
 var opportunityCount int
@@ -73,15 +72,10 @@ func handleCross(
 		feed.GetOrderBooks(symbol)
 
 	if len(orderBooks) < 2 {
-
 		return
 	}
 
 	now := time.Now().UnixMilli()
-
-	// -----------------------------------
-	// BASE ASSET
-	// -----------------------------------
 
 	baseAsset :=
 		strings.TrimSuffix(
@@ -108,14 +102,12 @@ func handleCross(
 			if now-buyOB.Time > 3000 {
 
 				metrics.StaleBooks.Inc()
-
 				continue
 			}
 
 			if now-sellOB.Time > 3000 {
 
 				metrics.StaleBooks.Inc()
-
 				continue
 			}
 
@@ -193,6 +185,7 @@ func handleCross(
 					symbol,
 					netSpread,
 				)
+
 				continue
 			}
 
@@ -213,6 +206,7 @@ func handleCross(
 
 				qty,
 			) {
+
 				log.Printf(
 					"❌ INVENTORY FAIL %s | %s -> %s",
 					symbol,
@@ -248,26 +242,22 @@ func handleCross(
 				},
 			)
 
+			// -----------------------------------
+			// REALTIME OPPORTUNITY STREAM
+			// -----------------------------------
+
 			websocket.Broadcast(
 				"OPPORTUNITY_FOUND",
 				map[string]interface{}{
-					"symbol": symbol,
-
-					"buy_exchange": buyEx,
-
-					"sell_exchange": sellEx,
-
-					"spread_percent": netSpread,
-
-					"buy_price": avgBuy,
-
-					"sell_price": avgSell,
-
+					"symbol":           symbol,
+					"buy_exchange":     buyEx,
+					"sell_exchange":    sellEx,
+					"spread_percent":   netSpread,
+					"buy_price":        avgBuy,
+					"sell_price":       avgSell,
 					"estimated_profit": (avgSell - avgBuy) * qty,
-
-					"latency_ms": 12,
-
-					"timestamp": time.Now().UnixMilli(),
+					"latency_ms":       12,
+					"timestamp":        time.Now().UnixMilli(),
 				},
 			)
 
@@ -292,29 +282,31 @@ func handleCross(
 				symbol,
 			)
 
-			defer func() {
+			allowed, reason :=
+				risk.AllowTrade(
 
-				unlock(lockKey)
+					userID,
 
-				log.Printf(
-					"🔓 LOCK RELEASED %s",
-					symbol,
+					tradeValue,
+
+					netSpread,
 				)
 
-			}()
+			if !allowed {
 
-			if !risk.AllowTrade(
-
-				userID,
-
-				tradeValue,
-
-				netSpread,
-			) {
 				log.Printf(
-					"❌ RISK FAIL %s | %.4f%%",
+					"❌ RISK FAIL %s | %s",
 					symbol,
-					netSpread)
+					reason,
+				)
+
+				websocket.BroadcastToUser(
+					userID,
+					"RISK_UPDATED",
+					risk.GetMetrics(userID),
+				)
+
+				unlock(lockKey)
 
 				continue
 			}
@@ -336,10 +328,18 @@ func handleCross(
 			// -----------------------------------
 			// EXECUTION
 			// -----------------------------------
+
 			risk.OpenTrade(
 				userID,
 				tradeValue,
 			)
+
+			websocket.BroadcastToUser(
+				userID,
+				"RISK_UPDATED",
+				risk.GetMetrics(userID),
+			)
+
 			go func(
 				tradeID string,
 				symbol string,
@@ -352,7 +352,15 @@ func handleCross(
 				tradeValue float64,
 			) {
 
-				defer unlock(lockKey)
+				defer func() {
+
+					unlock(lockKey)
+
+					log.Printf(
+						"🔓 LOCK RELEASED %s",
+						symbol,
+					)
+				}()
 
 				start := time.Now()
 
@@ -411,14 +419,6 @@ func handleCross(
 					qty*avgSell,
 				)
 
-				websocket.BroadcastToUser(
-					userID,
-					"PORTFOLIO_UPDATED",
-					map[string]interface{}{
-						"user_id": userID,
-					},
-				)
-
 				// -----------------------------------
 				// PROFIT
 				// -----------------------------------
@@ -436,6 +436,12 @@ func handleCross(
 					userID,
 					tradeValue,
 					profitUSDT,
+				)
+
+				websocket.BroadcastToUser(
+					userID,
+					"RISK_UPDATED",
+					risk.GetMetrics(userID),
 				)
 
 				// -----------------------------------
@@ -487,22 +493,52 @@ func handleCross(
 					},
 				)
 
+				// -----------------------------------
+				// TRADE STREAM
+				// -----------------------------------
+
 				websocket.BroadcastToUser(
 					userID,
 					"TRADE_EXECUTED",
 					map[string]interface{}{
 
-						"id":             tradeID,
-						"user_id":        userID,
-						"symbol":         symbol,
-						"buy_exchange":   buyEx,
-						"sell_exchange":  sellEx,
-						"profit_usdt":    profitUSDT,
+						"id": tradeID,
+
+						"user_id": userID,
+
+						"symbol": symbol,
+
+						"buy_exchange": buyEx,
+
+						"sell_exchange": sellEx,
+
+						"profit_usdt": profitUSDT,
+
 						"profit_percent": profitPercent,
-						"latency_ms":     duration.Milliseconds(),
-						"status":         "CLOSED",
-						"created_at":     time.Now().Format(time.RFC3339),
+
+						"trade_value": tradeValue,
+
+						"latency_ms": duration.Milliseconds(),
+
+						"status": "CLOSED",
+
+						"created_at": time.Now().Format(time.RFC3339),
 					},
+				)
+
+				// -----------------------------------
+				// REALTIME PORTFOLIO SYNC
+				// -----------------------------------
+
+				payload :=
+					BuildPortfolioPayload(
+						userID,
+					)
+
+				websocket.BroadcastToUser(
+					userID,
+					"PORTFOLIO_UPDATED",
+					payload,
 				)
 
 				log.Printf(
@@ -524,7 +560,6 @@ func handleCross(
 				qty,
 				tradeValue,
 			)
-
 		}
 	}
 }

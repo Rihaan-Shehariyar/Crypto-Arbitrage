@@ -11,7 +11,11 @@ func AllowTrade(
 	tradeValue float64,
 
 	spread float64,
-) bool {
+
+) (
+	bool,
+	string,
+) {
 
 	risk :=
 		GetUserRisk(userID)
@@ -21,8 +25,10 @@ func AllowTrade(
 	// -----------------------------------
 
 	if tradeValue > MaxTradeUSDT {
+		LastRejectReason =
+			"MAX_TRADE_EXCEEDED"
 
-		return false
+		return false, "MAX_TRADE_EXCEEDED"
 	}
 
 	// -----------------------------------
@@ -31,8 +37,10 @@ func AllowTrade(
 
 	if risk.ExposureUSDT+tradeValue >
 		MaxUserExposure {
+		LastRejectReason =
+			"MAX_EXPOSURE"
 
-		return false
+		return false, "MAX_EXPOSURE"
 	}
 
 	// -----------------------------------
@@ -41,8 +49,10 @@ func AllowTrade(
 
 	if risk.OpenTrades >=
 		MaxOpenTrades {
+		LastRejectReason =
+			"MAX_OPEN_TRADES"
 
-		return false
+		return false, "MAX_OPEN_TRADES"
 	}
 
 	// -----------------------------------
@@ -52,7 +62,10 @@ func AllowTrade(
 	if risk.DailyPnL <=
 		MaxDailyLossUSDT {
 
-		return false
+		LastRejectReason =
+			"MAX_DAILY_LOSS"
+
+		return false, "MAX_DAILY_LOSS"
 	}
 
 	// -----------------------------------
@@ -60,13 +73,34 @@ func AllowTrade(
 	// -----------------------------------
 
 	if spread < MinSpreadPercent {
+		LastRejectReason =
+			"SPREAD_TOO_LOW"
 
-		return false
+		return false, "SPREAD_TOO_LOW"
 	}
 
 	// if spread < -0.05 {
 
 	// 	return false
 	// }
-	return true
+	return true, ""
+}
+
+func GetMetrics(
+	userID string,
+) Metrics {
+
+	risk :=
+		GetUserRisk(userID)
+
+	return Metrics{
+
+		CurrentExposure: risk.ExposureUSDT,
+
+		OpenTrades: risk.OpenTrades,
+
+		DailyPnL: risk.DailyPnL,
+
+		LastRejectReason: LastRejectReason,
+	}
 }

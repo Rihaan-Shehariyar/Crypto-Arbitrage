@@ -2,6 +2,7 @@ package handler
 
 import (
 	"crypto-arbitrage/internal/auth"
+	"crypto-arbitrage/internal/db"
 	"log"
 	"net/http"
 
@@ -42,13 +43,53 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	token, err := auth.Login(body.Email, body.Password)
+	token, user, err := auth.Login(body.Email, body.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-	})
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+
+			"token": token,
+
+			"subscription_active": user.SubscriptionActive,
+		},
+	)
+}
+
+func ActivateSubscriptionHandler(
+	c *gin.Context,
+) {
+
+	userValue, exists :=
+		c.Get("user")
+
+	if !exists {
+
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "unauthorized",
+			},
+		)
+
+		return
+	}
+
+	user :=
+		userValue.(auth.User)
+
+	user.SubscriptionActive = true
+
+	db.DB.Save(&user)
+
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"message": "subscription activated",
+		},
+	)
 }

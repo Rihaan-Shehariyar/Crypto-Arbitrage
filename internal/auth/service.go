@@ -41,7 +41,8 @@ func Register(
 
 		Email: email,
 
-		Password: string(hash),
+		Password:           string(hash),
+		SubscriptionActive: false,
 	}
 
 	return db.DB.Create(&user).Error
@@ -50,7 +51,11 @@ func Register(
 func Login(
 	email string,
 	password string,
-) (string, error) {
+) (
+	string,
+	User,
+	error,
+) {
 
 	var user User
 
@@ -60,7 +65,7 @@ func Login(
 
 	if err != nil {
 
-		return "",
+		return "", User{},
 			errors.New(
 				"invalid credentials",
 			)
@@ -73,7 +78,7 @@ func Login(
 
 	if err != nil {
 
-		return "",
+		return "", User{},
 			errors.New(
 				"invalid credentials",
 			)
@@ -81,10 +86,10 @@ func Login(
 
 	token, err := GenerateToken(user.ID)
 	if err != nil {
-		return "", err
+		return "", User{}, err
 	}
 
-	return token, nil
+	return token, user, nil
 }
 
 func GetAllUsers() ([]User, error) {

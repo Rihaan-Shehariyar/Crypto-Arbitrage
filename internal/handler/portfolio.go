@@ -2,9 +2,7 @@ package handler
 
 import (
 	"crypto-arbitrage/internal/auth"
-	"crypto-arbitrage/internal/db"
-	"crypto-arbitrage/internal/inventory"
-	"crypto-arbitrage/internal/paper"
+	"crypto-arbitrage/internal/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -45,38 +43,13 @@ func PortfolioHandler(
 		userValue.(auth.User)
 
 	// -----------------------------------
-	// INVENTORY
+	// BUILD PAYLOAD
 	// -----------------------------------
 
-	balances :=
-		inventory.GetUserInventory(
+	payload :=
+		service.BuildPortfolioPayload(
 			user.ID,
 		)
-
-	// -----------------------------------
-	// TRADES
-	// -----------------------------------
-
-	var trades []paper.Trade
-
-	db.DB.
-		Where(
-			"user_id = ?",
-			user.ID,
-		).
-		Find(&trades)
-
-	// -----------------------------------
-	// AGGREGATE
-	// -----------------------------------
-
-	var totalProfit float64
-
-	for _, t := range trades {
-
-		totalProfit +=
-			t.ProfitUSDT
-	}
 
 	// -----------------------------------
 	// RESPONSE
@@ -84,13 +57,6 @@ func PortfolioHandler(
 
 	c.JSON(
 		http.StatusOK,
-		PortfolioResponse{
-
-			TotalProfitUSDT: totalProfit,
-
-			TotalTrades: len(trades),
-
-			Balances: balances,
-		},
+		payload,
 	)
 }
