@@ -3,6 +3,7 @@ package handler
 import (
 	"crypto-arbitrage/internal/auth"
 	"crypto-arbitrage/internal/db"
+	"crypto-arbitrage/internal/gRPC/payment"
 	"log"
 	"net/http"
 
@@ -82,6 +83,32 @@ func ActivateSubscriptionHandler(
 	user :=
 		userValue.(auth.User)
 
+	resp, err :=
+		payment.ProcessPayment(
+
+			user.ID,
+
+			49,
+		)
+	if err != nil {
+
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{
+				"error": "payment failed",
+			},
+		)
+
+		return
+	}
+
+	if resp.Success {
+
+		user.SubscriptionActive = true
+
+		db.DB.Save(&user)
+	}
+
 	user.SubscriptionActive = true
 
 	db.DB.Save(&user)
@@ -89,7 +116,10 @@ func ActivateSubscriptionHandler(
 	c.JSON(
 		http.StatusOK,
 		gin.H{
+
 			"message": "subscription activated",
+
+			"transaction_id": resp.TransactionId,
 		},
 	)
 }
