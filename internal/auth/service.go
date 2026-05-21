@@ -9,8 +9,10 @@ import (
 )
 
 func Register(
+	name string,
 	email string,
 	password string,
+
 ) error {
 
 	var existing User
@@ -36,6 +38,7 @@ func Register(
 	}
 
 	user := User{
+		Name: name,
 
 		ID: uuid.NewString(),
 

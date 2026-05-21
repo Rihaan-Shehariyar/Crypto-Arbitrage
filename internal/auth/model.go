@@ -3,6 +3,8 @@ package auth
 type User struct {
 	ID string `gorm:"primaryKey"`
 
+	Name string `json:"name"`
+
 	Email string `gorm:"uniqueIndex"`
 
 	Password string

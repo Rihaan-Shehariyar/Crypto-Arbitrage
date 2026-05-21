@@ -14,16 +14,31 @@ func RegisterHandler(c *gin.Context) {
 	log.Println("REGISTER HIT")
 
 	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Name            string `json:"name" binding:"required"`
+		Email           string `json:"email" binding:"required,email"`
+		Password        string `json:"password" binding:"required,min=6"`
+		ConfirmPassword string `json:"confirm_password" binding:"required"`
 	}
 
-	if err := c.BindJSON(&body); err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
 
-	err := auth.Register(body.Email, body.Password)
+	if body.Password !=
+		body.ConfirmPassword {
+
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "passwords do not match",
+			},
+		)
+
+		return
+	}
+
+	err := auth.Register(body.Name, body.Email, body.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -109,17 +124,17 @@ func ActivateSubscriptionHandler(
 		db.DB.Save(&user)
 	}
 
-	user.SubscriptionActive = true
-
-	db.DB.Save(&user)
-
 	c.JSON(
 		http.StatusOK,
 		gin.H{
 
+			"success": true,
+
 			"message": "subscription activated",
 
 			"transaction_id": resp.TransactionId,
+
+			"subscription_active": true,
 		},
 	)
 }
