@@ -23,7 +23,7 @@ func StartUserCache() {
 
 		ticker :=
 			time.NewTicker(
-				30 * time.Second,
+				5 * time.Second,
 			)
 
 		defer ticker.Stop()

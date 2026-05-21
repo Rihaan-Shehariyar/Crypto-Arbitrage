@@ -16,6 +16,12 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		if authHeader == "" {
 
+			authHeader =
+				c.Query("token")
+		}
+
+		if authHeader == "" {
+
 			c.JSON(
 				http.StatusUnauthorized,
 				gin.H{
@@ -28,25 +34,16 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		token := authHeader
+
 		const bearer = "Bearer "
 
-		if len(authHeader) <= len(bearer) ||
-			authHeader[:len(bearer)] != bearer {
+		if len(authHeader) > len(bearer) &&
+			authHeader[:len(bearer)] == bearer {
 
-			c.JSON(
-				http.StatusUnauthorized,
-				gin.H{
-					"error": "invalid authorization format",
-				},
-			)
-
-			c.Abort()
-
-			return
+			token =
+				authHeader[len(bearer):]
 		}
-
-		token :=
-			authHeader[len(bearer):]
 
 		userID, err := ValidateToken(
 			token,
