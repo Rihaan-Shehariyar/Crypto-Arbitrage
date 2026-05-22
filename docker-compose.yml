@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 services:
 
   # -----------------------------------
@@ -178,10 +179,30 @@ services:
     depends_on:
       - zookeeper
 
+=======
+version: '3'
+
+services:
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+
+    container_name: zookeeper
+
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka
+
+    container_name: kafka
+
+>>>>>>> 6394e3b89a9c45d6955ea19fbd8872e05aa9d4aa
     ports:
       - "9092:9092"
 
     environment:
+<<<<<<< HEAD
       KAFKA_BROKER_ID: 1
 
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -207,3 +228,36 @@ networks:
 
 volumes:
   postgres-data:
+=======
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+    depends_on:
+      - zookeeper
+
+  prometheus:
+    image: prom/prometheus
+
+    container_name: prometheus
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+
+    container_name: grafana
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  grafana-storage:
+>>>>>>> 6394e3b89a9c45d6955ea19fbd8872e05aa9d4aa
