@@ -1,0 +1,209 @@
+services:
+
+  # -----------------------------------
+  # FRONTEND
+  # -----------------------------------
+
+  frontend:
+    build:
+      context: ./Frontend
+
+    container_name: frontend
+
+    ports:
+      - "5173:5173"
+
+    environment:
+      VITE_API_URL: http://backend:8080
+
+    depends_on:
+      - backend
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # BACKEND
+  # -----------------------------------
+
+  backend:
+    build:
+      context: ./Backend
+
+    container_name: backend
+
+    ports:
+      - "8080:8080"
+
+    environment:
+
+      # DATABASE
+      POSTGRES_DSN: host=postgres user=postgres password=Rihaan@123 dbname=crypto-arb port=5432 sslmode=disable
+
+      # REDIS
+      REDIS_ADDR: redis:6379
+
+      # KAFKA
+      KAFKA_BROKER: kafka:9092
+
+      # PAYMENT GRPC
+      PAYMENT_GRPC_ADDR: payment-service:50051
+
+      # JWT
+      JWT_SECRET: super-secret-key
+
+      # EXCHANGE KEYS
+      BYBIT_KEY: k2YtJYCfjpl3hfPaPx
+      BYBIT_SECRET: zfkpToi93tDnWlkHKtO1jifbSErhXot0cExH
+
+      BINANCE_KEY: l741V8EPssJjSMlsz2fOnwKeavDpBhcD3SQhJ4io5hNAnvwPw6zmSKgNhJIy44gg
+      BINANCE_SECRET: zngkjvz83tEsXdb0kzCoqAcWFNec6pRdrvnzJbgV7iW44aV6iaSxearFNpLTeEBD
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_started
+
+      kafka:
+        condition: service_started
+
+      payment-service:
+        condition: service_started
+
+    restart: always
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # PAYMENT SERVICE
+  # -----------------------------------
+
+  payment-service:
+    build:
+      context: ./Backend
+      dockerfile: ./cmd/payment/Dockerfile
+
+    container_name: payment-service
+
+    ports:
+      - "50051:50051"
+
+    restart: always
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # POSTGRES
+  # -----------------------------------
+
+  postgres:
+    image: postgres:16
+
+    container_name: postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Rihaan@123
+      POSTGRES_DB: crypto-arb
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # REDIS
+  # -----------------------------------
+
+  redis:
+    image: redis/redis-stack:latest
+
+    container_name: redis
+
+    restart: always
+
+    ports:
+      - "6379:6379"
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # ZOOKEEPER
+  # -----------------------------------
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+
+    container_name: zookeeper
+
+    restart: always
+
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+    ports:
+      - "2181:2181"
+
+    networks:
+      - arbitrage-network
+
+  # -----------------------------------
+  # KAFKA
+  # -----------------------------------
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+
+    container_name: kafka
+
+    restart: always
+
+    depends_on:
+      - zookeeper
+
+    ports:
+      - "9092:9092"
+
+    environment:
+      KAFKA_BROKER_ID: 1
+
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+    networks:
+      - arbitrage-network
+
+# -----------------------------------
+# NETWORKS
+# -----------------------------------
+
+networks:
+  arbitrage-network:
+
+# -----------------------------------
+# VOLUMES
+# -----------------------------------
+
+volumes:
+  postgres-data:

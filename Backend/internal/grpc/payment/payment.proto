@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package payment;
+
+option go_package = "crypto-arbitrage/internal/grpc/payment/paymentpb";
+
+service PaymentService {
+
+  rpc ProcessPayment (
+    PaymentRequest
+  ) returns (
+    PaymentResponse
+  );
+}
+
+message PaymentRequest {
+
+  string user_id = 1;
+
+  double amount = 2;
+}
+
+message PaymentResponse {
+
+  bool success = 1;
+
+  string transaction_id = 2;
+
+  string message = 3;
+}

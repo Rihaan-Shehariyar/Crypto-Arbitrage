@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 5%; /* #0D0D0D */
+    --foreground: 0 0% 98%;
+    
+    --surface: 0 0% 7%; /* #111111 */
+    --surface-foreground: 0 0% 98%;
+    
+    --primary: 170 76% 64%; /* #5EEAD4 */
+    --primary-foreground: 0 0% 5%;
+
+    --muted: 0 0% 10%; /* #1A1A1A */
+    --muted-foreground: 0 0% 63%; /* #A1A1AA */
+
+    --border: 0 0% 13%; /* #222222 */
+    
+    /* Chart Colors */
+    --chart-1: 170 76% 64%; /* Primary Mint */
+    --chart-2: 217 91% 60%; /* Blue */
+    --chart-3: 280 65% 60%; /* Purple */
+    --chart-4: 340 75% 55%; /* Pink */
+    --chart-5: 35 91% 54%;  /* Orange */
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+}
+
+/* Utilities */
+@layer utilities {
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-md border border-border/50 shadow-lg;
+  }
+  .neon-text {
+    text-shadow: 0 0 10px rgba(94, 234, 212, 0.5);
+  }
+}
+
+@keyframes row-flash-green {
+  0% {
+    background-color: rgba(94, 234, 212, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-flash-green {
+  animation: row-flash-green 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Institutional Dense Terminal Theme utilities */
+.terminal-row {
+  @apply font-mono text-xs border-b border-border/30 hover:bg-muted/40 transition-colors;
+}
+
+.terminal-header {
+  @apply font-mono text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-black/40 border-b border-border py-2 px-4;
+}
+
+.terminal-badge {
+  @apply inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase;
+}
+
+@keyframes pulse-cyan {
+  0% {
+    box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.4);
+    background-color: rgba(94, 234, 212, 0.15);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(94, 234, 212, 0);
+    background-color: transparent;
+  }
+}
+
+.animate-pulse-cyan {
+  animation: pulse-cyan 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+

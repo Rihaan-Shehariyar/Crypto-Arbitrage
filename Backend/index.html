@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arbitrage Dashboard</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+        }
+
+        header {
+            padding: 20px;
+            background: #020617;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        h1 { margin: 0; }
+
+        #time { color: #94a3b8; }
+
+        #bestTrade {
+            padding: 15px;
+            text-align: center;
+            background: #022c22;
+            border-bottom: 1px solid #1e293b;
+            font-weight: bold;
+        }
+
+        #controls {
+            padding: 15px;
+            text-align: center;
+            background: #020617;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        input {
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: none;
+            background: #38bdf8;
+            color: black;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 18px;
+            border-radius: 10px;
+            transition: 0.2s;
+        }
+
+        .card:hover {
+            transform: scale(1.03);
+        }
+
+        .coin {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .section {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .profit {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .green { color: #22c55e; }
+        .red { color: #ef4444; }
+
+        .action {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #38bdf8;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1> Arbitrage Dashboard</h1>
+    <div id="time">Connecting...</div>
+</header>
+
+<div id="bestTrade">Waiting for data...</div>
+
+<div id="controls">
+    <input id="coinInput" placeholder="Enter Coin (e.g. ETHUSDT)">
+    <button onclick="filterCoin()">Search</button>
+    <button onclick="resetFilter()">Reset</button>
+</div>
+
+<div id="container"></div>
+
+<script>
+let fullList = [];
+
+function connectWS() {
+    const ws = new WebSocket("ws://localhost:8080/ws");
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        fullList = data.opportunities || [];
+
+        document.getElementById("time").innerText =
+            "Last update: " + new Date(data.timestamp).toLocaleTimeString();
+
+        // 🔥 BEST TRADE
+        if (data.best_trade) {
+            const b = data.best_trade;
+
+            document.getElementById("bestTrade").innerHTML = `
+                🔥 BEST TRADE →
+                ${b.coin} |
+                ${b.buy_from} → ${b.sell_to} |
+                Profit: ${b.profit.toFixed(2)}
+            `;
+        }
+
+        // fallback if no data
+        if (fullList.length === 0) {
+            fullList = [{
+                coin: "BTCUSDT",
+                buy_from: "binance",
+                sell_to: "kucoin",
+                buy_price: 75000,
+                sell_price: 74980,
+                profit: -20,
+                action: "Demo data"
+            }];
+        }
+
+        render(fullList);
+    };
+
+    ws.onclose = () => {
+        document.getElementById("time").innerText = "Reconnecting...";
+        setTimeout(connectWS, 2000);
+    };
+
+    ws.onerror = () => {
+        ws.close();
+    };
+}
+
+function render(list) {
+    const container = document.getElementById("container");
+
+    let html = "";
+
+    list.forEach((item, index) => {
+
+        const buy = item.buy_price || 0;
+        const sell = item.sell_price || 0;
+
+        const spread = sell - buy;
+
+        const profitPercent = buy > 0
+            ? ((sell - buy) / buy) * 100
+            : 0;
+
+        const isProfit = item.profit > 0;
+        const profitClass = isProfit ? "green" : "red";
+        const status = isProfit ? "PROFIT" : "LOSS";
+
+        const border = index === 0 ? "2px solid gold" : "none";
+
+        html += `
+            <div class="card" style="border:${border}">
+                <div class="coin">${item.coin}</div>
+
+                <div class="section">
+                    <b>BUY:</b> ${item.buy_from || "N/A"} <br>
+                    Price: ${buy.toFixed(2)}
+                </div>
+
+                <div class="section">
+                    <b>SELL:</b> ${item.sell_to || "N/A"} <br>
+                    Price: ${sell.toFixed(2)}
+                </div>
+
+                <div class="section">
+                    Spread: ${spread.toFixed(2)}
+                </div>
+
+                <div class="profit ${profitClass}">
+                    ${status}: ${item.profit.toFixed(2)} 
+                    (${profitPercent.toFixed(3)}%)
+                </div>
+
+                <div class="action">
+                    ${item.action || ""}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function filterCoin() {
+    const coin = document.getElementById("coinInput").value.toUpperCase();
+
+    const filtered = fullList.filter(item => item.coin === coin);
+
+    if (filtered.length === 0) {
+        alert("No data for this coin");
+        return;
+    }
+
+    render(filtered);
+}
+
+function resetFilter() {
+    render(fullList);
+}
+
+connectWS();
+</script>
+
+</body>
+</html>
