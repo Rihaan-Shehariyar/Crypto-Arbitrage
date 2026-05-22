@@ -1,90 +1,49 @@
 package service
 
 import (
-	"crypto-arbitrage/internal/auth"
+	"crypto-arbitrage/internal/redis"
 	"log"
-	"sync"
-	"time"
 )
 
-var userCacheMu sync.RWMutex
-
-var cachedUsers []auth.User
-
-// -----------------------------------
-// START USER CACHE
-// -----------------------------------
-
-func StartUserCache() {
-
-	RefreshUsers()
-
-	go func() {
-
-		ticker :=
-			time.NewTicker(
-				5 * time.Second,
-			)
-
-		defer ticker.Stop()
-
-		for range ticker.C {
-
-			RefreshUsers()
-		}
-	}()
-}
-
-// -----------------------------------
-// REFRESH USERS
-// -----------------------------------
-
-func RefreshUsers() {
-
-	users, err :=
-		auth.GetAllUsers()
-
-	if err != nil {
-
-		log.Println(
-			"[USER CACHE] refresh failed:",
-			err,
-		)
-
-		return
-	}
-
-	userCacheMu.Lock()
-
-	cachedUsers = users
-
-	userCacheMu.Unlock()
-
+func AddActiveTrader(
+	userID string,
+) error {
 	log.Printf(
-		"[USER CACHE] refreshed (%d users)",
-		len(users),
+		"[REDIS] added trader %s",
+		userID,
 	)
+	return redis.Client.SAdd(
+
+		redis.Ctx,
+
+		"active_traders",
+
+		userID,
+	).Err()
 }
 
-// -----------------------------------
-// GET USERS
-// -----------------------------------
+func RemoveActiveTrader(
+	userID string,
+) error {
 
-func GetCachedUsers() []auth.User {
+	return redis.Client.SRem(
 
-	userCacheMu.RLock()
-	defer userCacheMu.RUnlock()
+		redis.Ctx,
 
-	users :=
-		make(
-			[]auth.User,
-			len(cachedUsers),
-		)
+		"active_traders",
 
-	copy(
-		users,
-		cachedUsers,
-	)
+		userID,
+	).Err()
+}
+func GetActiveTraders() (
+	[]string,
+	error,
+) {
 
-	return users
+	return redis.Client.SMembers(
+
+		redis.Ctx,
+
+		"active_traders",
+	).Result()
 }

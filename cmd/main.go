@@ -13,6 +13,7 @@ import (
 	"crypto-arbitrage/internal/opportunity"
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
+	"crypto-arbitrage/internal/redis"
 	"crypto-arbitrage/internal/service"
 	"crypto-arbitrage/internal/websocket"
 	"log"
@@ -38,6 +39,7 @@ func main() {
 
 	db.Connect()
 
+	redis.InitRedis()
 	err := inventory.LoadInventories()
 
 	if err != nil {
@@ -192,7 +194,7 @@ func main() {
 
 	// EVENT CONSUMER
 
-	service.StartUserCache()
+	service.GetActiveTraders()
 
 	service.StartCrossWorkers(10)
 

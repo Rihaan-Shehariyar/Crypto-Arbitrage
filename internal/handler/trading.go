@@ -30,6 +30,9 @@ func StartTradingHandler(
 	user := userValue.(auth.User)
 
 	user.TradingEnabled = true
+	service.AddActiveTrader(
+		user.ID,
+	)
 
 	err := db.DB.Save(&user).Error
 
@@ -44,8 +47,6 @@ func StartTradingHandler(
 
 		return
 	}
-
-	service.RefreshUsers()
 
 	c.JSON(
 		http.StatusOK,
@@ -75,6 +76,9 @@ func StopTradingHandler(
 	user := userValue.(auth.User)
 
 	user.TradingEnabled = false
+	service.RemoveActiveTrader(
+		user.ID,
+	)
 
 	err := db.DB.Save(&user).Error
 

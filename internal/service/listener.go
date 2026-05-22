@@ -60,8 +60,8 @@ func StartEventConsumer(
 					// LOAD USERS
 					// -----------------------------------
 
-					users :=
-						GetCachedUsers()
+					users, _ :=
+						GetActiveTraders()
 
 					log.Printf(
 						"[EVENT] cached users: %d",
@@ -72,21 +72,21 @@ func StartEventConsumer(
 					// LOOP USERS
 					// -----------------------------------
 
-					for _, user := range users {
+					for _, userID := range users {
 
 						// -----------------------------------
 						// THROTTLE
 						// -----------------------------------
 
 						if !ShouldSchedule(
-							user.ID,
+							userID,
 							ob.Symbol,
 						) {
 
 							log.Printf(
 								"[SCHEDULER] skipped %s for %s",
 								ob.Symbol,
-								user.ID,
+								userID,
 							)
 
 							continue
@@ -95,7 +95,7 @@ func StartEventConsumer(
 						log.Printf(
 							"[SCHEDULER] accepted %s for %s",
 							ob.Symbol,
-							user.ID,
+							userID,
 						)
 
 						// -----------------------------------
@@ -106,7 +106,7 @@ func StartEventConsumer(
 
 						case CrossJobs <- CrossJob{
 
-							UserID: user.ID,
+							UserID: userID,
 
 							Symbol:   ob.Symbol,
 							QueuedAt: time.Now().UnixMilli(),
@@ -115,7 +115,7 @@ func StartEventConsumer(
 							log.Printf(
 								"[QUEUE] enqueued %s for %s",
 								ob.Symbol,
-								user.ID,
+								userID,
 							)
 
 						default:
