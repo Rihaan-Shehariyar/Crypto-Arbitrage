@@ -4,6 +4,7 @@ import (
 	"crypto-arbitrage/internal/auth"
 	"crypto-arbitrage/internal/db"
 	"crypto-arbitrage/internal/grpc/payment"
+
 	"log"
 	"net/http"
 
@@ -107,10 +108,14 @@ func ActivateSubscriptionHandler(
 		)
 	if err != nil {
 
+		log.Println(
+			"SUBSCRIPTION ERROR:",
+			err,
+		)
 		c.JSON(
 			http.StatusInternalServerError,
 			gin.H{
-				"error": "payment failed",
+				"error": err,
 			},
 		)
 

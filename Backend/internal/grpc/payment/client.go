@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"os"
 
 	paymentpb "crypto-arbitrage/internal/grpc/payment/paymentpb"
 
@@ -21,15 +22,12 @@ func ProcessPayment(
 	error,
 ) {
 
-	conn, err :=
-		grpc.Dial(
-
-			"localhost:50051",
-
-			grpc.WithTransportCredentials(
-				insecure.NewCredentials(),
-			),
-		)
+	conn, err := grpc.Dial(
+		os.Getenv("PAYMENT_GRPC_ADDR"),
+		grpc.WithTransportCredentials(
+			insecure.NewCredentials(),
+		),
+	)
 
 	if err != nil {
 
