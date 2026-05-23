@@ -4,8 +4,9 @@ import { Activity, Shield, Terminal, Key } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { login } from '@/services/endpoints';
 import { toast } from 'sonner';
-import { isAxiosError } from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLogin } from "@react-oauth/google"
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -168,6 +169,61 @@ export default function Login() {
                   <Key className="w-3.5 h-3.5" />
                   Unlock Console
                 </button>
+
+<div className="flex justify-center mt-4">
+
+<GoogleLogin
+
+  onSuccess={async (credentialResponse) => {
+
+    try {
+
+      const token =
+        credentialResponse.credential
+
+      const res = await axios.post(
+        "http://127.0.0.1:8080/auth/google",
+        {
+          token,
+        },
+      )
+
+    setToken(res.data.token)
+
+const isSubscribed =
+	res.data.subscription_active === true
+
+setSubscriptionActive(
+	isSubscribed,
+)
+
+if (isSubscribed) {
+
+	navigate("/dashboard")
+
+} else {
+
+	navigate("/pricing")
+}
+
+    } catch (err) {
+
+      console.error(
+        err,
+      )
+    }
+  }}
+
+  onError={() => {
+
+    toast.error(
+      "Google authentication failed",
+    )
+
+  }}
+/>
+
+</div>
               </motion.form>
             ) : (
               <motion.div 
