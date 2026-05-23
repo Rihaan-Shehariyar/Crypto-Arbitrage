@@ -1,14 +1,19 @@
 package handler
 
 import (
+	"context"
 	"crypto-arbitrage/internal/auth"
 	"crypto-arbitrage/internal/db"
 	"crypto-arbitrage/internal/grpc/payment"
+	"os"
+
+	"google.golang.org/api/idtoken"
 
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func RegisterHandler(c *gin.Context) {
@@ -125,8 +130,27 @@ func ActivateSubscriptionHandler(
 	if resp.Success {
 
 		user.SubscriptionActive = true
+		log.Println(
+			"USER ID:",
+			user.ID,
+		)
 
-		db.DB.Save(&user)
+		log.Println(
+			"SUB BEFORE:",
+			user.SubscriptionActive,
+		)
+		if err := db.DB.
+			Save(&user).Error; err != nil {
+
+			log.Println(
+				"DB SAVE ERROR:",
+				err,
+			)
+		}
+		log.Println(
+			"SUB AFTER:",
+			user.SubscriptionActive,
+		)
 	}
 
 	c.JSON(
@@ -140,6 +164,138 @@ func ActivateSubscriptionHandler(
 			"transaction_id": resp.TransactionId,
 
 			"subscription_active": true,
+		},
+	)
+}
+func GoogleLogin(
+	c *gin.Context,
+) {
+
+	type GoogleAuthRequest struct {
+		Token string `json:"token"`
+	}
+
+	var req GoogleAuthRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "invalid request",
+			},
+		)
+
+		return
+	}
+
+	payload, err := idtoken.Validate(
+		context.Background(),
+		req.Token,
+		os.Getenv("GOOGLE_CLIENT_ID"),
+	)
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "invalid google token",
+			},
+		)
+
+		return
+	}
+
+	email :=
+		payload.Claims["email"].(string)
+
+	name :=
+		payload.Claims["name"].(string)
+
+	log.Println(
+		"google login:",
+		email,
+		name,
+	)
+
+	// -----------------------------------
+	// FIND EXISTING USER
+	// -----------------------------------
+
+	var user auth.User
+
+	err = db.DB.
+		Where(
+			"email = ?",
+			email,
+		).
+		First(&user).Error
+
+	// -----------------------------------
+	// CREATE USER IF NOT EXISTS
+	// -----------------------------------
+
+	if err != nil {
+
+		user = auth.User{
+			ID:    uuid.NewString(),
+			Name:  name,
+			Email: email,
+		}
+
+		if err := db.DB.
+			Create(&user).Error; err != nil {
+
+			c.JSON(
+				http.StatusInternalServerError,
+				gin.H{
+					"error": "failed to create user",
+				},
+			)
+
+			return
+		}
+	}
+
+	// -----------------------------------
+	// GENERATE JWT
+	// -----------------------------------
+
+	token, _, err :=
+		auth.LoginGoogle(
+			user,
+		)
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{
+				"error": "failed to generate token",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// SUCCESS RESPONSE
+	// -----------------------------------
+
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+
+			"token": token,
+
+			"subscription_active": user.SubscriptionActive,
+
+			"user": gin.H{
+				"id":    user.ID,
+				"name":  user.Name,
+				"email": user.Email,
+			},
 		},
 	)
 }

@@ -27,13 +27,50 @@ func StartTradingHandler(
 		return
 	}
 
-	user := userValue.(auth.User)
+	// -----------------------------------
+	// GET JWT USER
+	// -----------------------------------
+
+	jwtUser := userValue.(auth.User)
+
+	// -----------------------------------
+	// FETCH FRESH USER FROM DB
+	// -----------------------------------
+
+	var user auth.User
+
+	err := db.DB.
+		Where(
+			"id = ?",
+			jwtUser.ID,
+		).
+		First(&user).Error
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "user not found",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// ENABLE TRADING
+	// -----------------------------------
 
 	user.TradingEnabled = true
-	err :=
-		service.AddActiveTrader(
-			user.ID,
-		)
+
+	// -----------------------------------
+	// REGISTER ACTIVE TRADER
+	// -----------------------------------
+
+	err = service.AddActiveTrader(
+		user.ID,
+	)
 
 	if err != nil {
 
@@ -47,7 +84,16 @@ func StartTradingHandler(
 		return
 	}
 
-	err = db.DB.Save(&user).Error
+	// -----------------------------------
+	// UPDATE DB
+	// -----------------------------------
+
+	err = db.DB.
+		Model(&user).
+		Update(
+			"trading_enabled",
+			true,
+		).Error
 
 	if err != nil {
 
@@ -61,6 +107,10 @@ func StartTradingHandler(
 		return
 	}
 
+	// -----------------------------------
+	// SUCCESS
+	// -----------------------------------
+
 	c.JSON(
 		http.StatusOK,
 		gin.H{
@@ -68,6 +118,7 @@ func StartTradingHandler(
 		},
 	)
 }
+
 func StopTradingHandler(
 	c *gin.Context,
 ) {
@@ -86,13 +137,50 @@ func StopTradingHandler(
 		return
 	}
 
-	user := userValue.(auth.User)
+	// -----------------------------------
+	// GET JWT USER
+	// -----------------------------------
+
+	jwtUser := userValue.(auth.User)
+
+	// -----------------------------------
+	// FETCH FRESH USER FROM DB
+	// -----------------------------------
+
+	var user auth.User
+
+	err := db.DB.
+		Where(
+			"id = ?",
+			jwtUser.ID,
+		).
+		First(&user).Error
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "user not found",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// DISABLE TRADING
+	// -----------------------------------
 
 	user.TradingEnabled = false
-	err :=
-		service.RemoveActiveTrader(
-			user.ID,
-		)
+
+	// -----------------------------------
+	// REMOVE ACTIVE TRADER
+	// -----------------------------------
+
+	err = service.RemoveActiveTrader(
+		user.ID,
+	)
 
 	if err != nil {
 
@@ -106,7 +194,16 @@ func StopTradingHandler(
 		return
 	}
 
-	err = db.DB.Save(&user).Error
+	// -----------------------------------
+	// UPDATE DB
+	// -----------------------------------
+
+	err = db.DB.
+		Model(&user).
+		Update(
+			"trading_enabled",
+			false,
+		).Error
 
 	if err != nil {
 
@@ -119,6 +216,10 @@ func StopTradingHandler(
 
 		return
 	}
+
+	// -----------------------------------
+	// SUCCESS
+	// -----------------------------------
 
 	c.JSON(
 		http.StatusOK,

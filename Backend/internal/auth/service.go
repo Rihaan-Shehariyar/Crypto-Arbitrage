@@ -108,3 +108,20 @@ func GetAllUsers() ([]User, error) {
 
 	return users, err
 }
+
+func LoginGoogle(
+	user User,
+) (string, User, error) {
+
+	token, err :=
+		GenerateToken(
+			user.ID,
+		)
+
+	if err != nil {
+
+		return "", User{}, err
+	}
+
+	return token, user, nil
+}

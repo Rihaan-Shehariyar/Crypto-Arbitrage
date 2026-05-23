@@ -251,6 +251,11 @@ func main() {
 		handler.LoginHandler,
 	)
 
+	r.POST(
+		"/auth/google",
+		handler.GoogleLogin,
+	)
+
 	// AUTH ROUTES
 
 	authGroup := r.Group("/")
