@@ -6,7 +6,8 @@ import { login } from '@/services/endpoints';
 import { toast } from 'sonner';
 import axios, { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-  import { useGoogleLogin } from "@react-oauth/google"
+import { GoogleLogin } from "@react-oauth/google"
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,56 +21,7 @@ export default function Login() {
   const searchParams = new URLSearchParams(location.search);
   const queryRedirect = searchParams.get('redirect');
   const redirectPath = queryRedirect || (location.state as any)?.from?.pathname;
-const googleLogin = useGoogleLogin({
 
-  flow: "implicit",
-
-  onSuccess: async (tokenResponse) => {
-
-    try {
-
-      const res = await axios.post(
-        "http://127.0.0.1:8080/auth/google",
-        {
-          token: tokenResponse.access_token,
-        },
-      )
-
-      setToken(res.data.token)
-
-      const isSubscribed =
-        res.data.subscription_active === true
-
-      setSubscriptionActive(
-        isSubscribed,
-      )
-
-      if (isSubscribed) {
-
-        navigate("/dashboard")
-
-      } else {
-
-        navigate("/pricing")
-      }
-
-    } catch (err) {
-
-      console.error(err)
-
-      toast.error(
-        "Google authentication failed",
-      )
-    }
-  },
-
-  onError: () => {
-
-    toast.error(
-      "Google authentication failed",
-    )
-  },
-})
   const loadingTexts = [
     'ESTABLISHING SECURE CONNECTION...',
     'VALIDATING WORKSPACE CREDENTIALS...',
@@ -128,8 +80,6 @@ const googleLogin = useGoogleLogin({
       setIsLoading(false);
     }
   };
-
-
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] text-foreground p-4 select-none relative overflow-hidden font-mono">
@@ -222,47 +172,56 @@ const googleLogin = useGoogleLogin({
 
 <div className="flex justify-center mt-4">
 
-<button
-  type="button"
-  onClick={() => googleLogin()}
-  className="
-    w-full
-    bg-[#151515]
-    border
-    border-border
-    hover:border-primary/40
-    text-white
-    font-bold
-    text-xs
-    py-3
-    rounded
-    uppercase
-    tracking-wider
-    transition-all
-    duration-300
-    flex
-    items-center
-    justify-center
-    gap-3
-    mt-3
-    hover:bg-[#1A1A1A]
-  "
->
+<GoogleLogin
 
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 48 48"
-    className="w-4 h-4"
-  >
-    <path
-      fill="#FFC107"
-      d="M43.611 20.083H42V20H24v8h11.303C33.659 32.657 29.243 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-    />
-  </svg>
+  onSuccess={async (credentialResponse) => {
 
-  Continue with Google
+    try {
 
-</button>
+      const token =
+        credentialResponse.credential
+
+      const res = await axios.post(
+        "http://127.0.0.1:8080/auth/google",
+        {
+          token,
+        },
+      )
+
+    setToken(res.data.token)
+
+const isSubscribed =
+	res.data.subscription_active === true
+
+setSubscriptionActive(
+	isSubscribed,
+)
+
+if (isSubscribed) {
+
+	navigate("/dashboard")
+
+} else {
+
+	navigate("/pricing")
+}
+
+    } catch (err) {
+
+      console.error(
+        err,
+      )
+    }
+  }}
+
+  onError={() => {
+
+    toast.error(
+      "Google authentication failed",
+    )
+
+  }}
+/>
 
 </div>
               </motion.form>

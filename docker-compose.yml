@@ -63,6 +63,9 @@ services:
       BINANCE_KEY: l741V8EPssJjSMlsz2fOnwKeavDpBhcD3SQhJ4io5hNAnvwPw6zmSKgNhJIy44gg
       BINANCE_SECRET: zngkjvz83tEsXdb0kzCoqAcWFNec6pRdrvnzJbgV7iW44aV6iaSxearFNpLTeEBD
 
+      #Google Auth
+      GOOGLE_CLIENT_ID: 560044356850-lvlm99cng9i1lusi76dt882eb2b5cvjm.apps.googleusercontent.com
+
     depends_on:
       postgres:
         condition: service_healthy

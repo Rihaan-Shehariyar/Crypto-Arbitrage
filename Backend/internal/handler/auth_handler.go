@@ -167,6 +167,158 @@ func ActivateSubscriptionHandler(
 		},
 	)
 }
+
+func GoogleRegister(
+	c *gin.Context,
+) {
+
+	type GoogleAuthRequest struct {
+		Token string `json:"token"`
+	}
+
+	var req GoogleAuthRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "invalid request",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// VALIDATE GOOGLE TOKEN
+	// -----------------------------------
+
+	payload, err := idtoken.Validate(
+
+		context.Background(),
+
+		req.Token,
+
+		os.Getenv("GOOGLE_CLIENT_ID"),
+	)
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "invalid google token",
+			},
+		)
+
+		return
+	}
+
+	email :=
+		payload.Claims["email"].(string)
+
+	name :=
+		payload.Claims["name"].(string)
+
+	// -----------------------------------
+	// CHECK IF USER EXISTS
+	// -----------------------------------
+
+	var existing auth.User
+
+	err = db.DB.
+		Where(
+			"email = ?",
+			email,
+		).
+		First(&existing).Error
+
+	if err == nil {
+
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "user already exists",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// CREATE USER
+	// -----------------------------------
+
+	user := auth.User{
+
+		ID: uuid.NewString(),
+
+		Name: name,
+
+		Email: email,
+
+		SubscriptionActive: false,
+
+		TradingEnabled: false,
+	}
+
+	if err := db.DB.
+		Create(&user).Error; err != nil {
+
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{
+				"error": "failed to create user",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// GENERATE JWT
+	// -----------------------------------
+
+	token, err := auth.GenerateToken(
+		user.ID,
+	)
+
+	if err != nil {
+
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{
+				"error": "failed to generate token",
+			},
+		)
+
+		return
+	}
+
+	// -----------------------------------
+	// SUCCESS
+	// -----------------------------------
+
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+
+			"token": token,
+
+			"subscription_active": user.SubscriptionActive,
+
+			"user": gin.H{
+
+				"id": user.ID,
+
+				"name": user.Name,
+
+				"email": user.Email,
+			},
+		},
+	)
+}
 func GoogleLogin(
 	c *gin.Context,
 ) {
@@ -232,32 +384,17 @@ func GoogleLogin(
 		).
 		First(&user).Error
 
-	// -----------------------------------
-	// CREATE USER IF NOT EXISTS
-	// -----------------------------------
-
 	if err != nil {
 
-		user = auth.User{
-			ID:    uuid.NewString(),
-			Name:  name,
-			Email: email,
-		}
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{
+				"error": "user not registered",
+			},
+		)
 
-		if err := db.DB.
-			Create(&user).Error; err != nil {
-
-			c.JSON(
-				http.StatusInternalServerError,
-				gin.H{
-					"error": "failed to create user",
-				},
-			)
-
-			return
-		}
+		return
 	}
-
 	// -----------------------------------
 	// GENERATE JWT
 	// -----------------------------------

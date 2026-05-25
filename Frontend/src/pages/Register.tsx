@@ -4,8 +4,9 @@ import { Shield, Terminal, Key, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { register, login } from '@/services/endpoints';
 import { toast } from 'sonner';
-import { isAxiosError } from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -241,6 +242,116 @@ export default function Register() {
                 </div>
 
                 <div className="text-[10px] bg-red-500/5 border border-red-500/20 p-2.5 text-red-400 leading-relaxed uppercase">
+<div className="relative mt-5">
+
+  {/* Divider */}
+
+  <div className="flex items-center gap-3 mb-4">
+
+    <div className="h-px flex-1 bg-border" />
+
+    <span
+      className="
+        text-[10px]
+        uppercase
+        tracking-[0.3em]
+        text-muted-foreground
+      "
+    >
+      OR REGISTER WITH
+    </span>
+
+    <div className="h-px flex-1 bg-border" />
+
+  </div>
+
+  {/* Google Container */}
+
+  <div
+    className="
+      w-full
+      rounded-xl
+      border
+      border-border/60
+      bg-[#0F1115]
+      p-4
+      hover:border-primary/30
+      transition-all
+      duration-300
+      shadow-[0_0_20px_rgba(0,255,255,0.03)]
+    "
+  >
+
+    <div className="flex justify-center">
+
+      <GoogleLogin
+
+        theme="filled_black"
+
+        size="large"
+
+        shape="pill"
+
+        text="signup_with"
+
+        logo_alignment="left"
+
+        width="320"
+
+        onSuccess={async (
+          credentialResponse,
+        ) => {
+
+          try {
+
+            const res =
+              await axios.post(
+
+                "http://127.0.0.1:8080/register/google",
+
+                {
+                  token:
+                    credentialResponse.credential,
+                },
+              )
+
+            setToken(
+              res.data.token,
+            )
+
+            setSubscriptionActive(
+              false,
+            )
+
+            toast.success(
+              "GOOGLE PROFILE REGISTERED",
+            )
+
+            navigate("/pricing")
+
+          } catch (err) {
+
+            console.error(err)
+
+            toast.error(
+              "GOOGLE REGISTRATION FAILED",
+            )
+          }
+        }}
+
+        onError={() => {
+
+          toast.error(
+            "GOOGLE REGISTRATION FAILED",
+          )
+        }}
+      />
+
+    </div>
+
+  </div>
+
+</div>
                   <span className="font-bold">NOTICE:</span> Subscribed plans are required to unlock live scanner streams, multi-exchange paper orders, and backtesting metrics.
                 </div>
 

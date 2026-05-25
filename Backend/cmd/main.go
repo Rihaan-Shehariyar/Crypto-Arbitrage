@@ -250,6 +250,10 @@ func main() {
 		"/login",
 		handler.LoginHandler,
 	)
+	r.POST(
+		"/register/google",
+		handler.GoogleRegister,
+	)
 
 	r.POST(
 		"/auth/google",
