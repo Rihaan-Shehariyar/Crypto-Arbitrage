@@ -188,7 +188,7 @@ export default function Login() {
         },
       )
 
-    setToken(res.data.token)
+    setToken(res.data.token) 
 
 const isSubscribed =
 	res.data.subscription_active === true
