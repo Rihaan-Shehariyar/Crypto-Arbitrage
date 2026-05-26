@@ -3,6 +3,15 @@ export interface LoginResponse {
   subscription_active?: boolean;
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  subscription_active: boolean;
+  trading_enabled: boolean;
+  auth_provider: string;
+}
+
 export interface PortfolioSummary {
   total_profit_usdt: number;
   total_trades: number;

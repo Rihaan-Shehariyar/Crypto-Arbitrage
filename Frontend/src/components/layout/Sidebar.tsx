@@ -1,5 +1,5 @@
-import { Home, PieChart, Activity, Settings, ArrowLeftRight } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { Home, PieChart, Activity, Settings, ArrowLeftRight, User } from 'lucide-react';
+import { NavLink, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
@@ -8,6 +8,7 @@ export function Sidebar() {
     { icon: Activity, label: 'Scanner', path: '/opportunities' },
     { icon: PieChart, label: 'Portfolio', path: '/portfolio' },
     { icon: ArrowLeftRight, label: 'Transactions', path: '/transactions' },
+    { icon: User, label: 'Profile', path: '/profile' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
@@ -41,13 +42,15 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 mb-4">
-        <div className="w-10 h-10 md:w-full md:h-auto rounded-xl bg-muted p-2 flex items-center justify-center md:justify-start cursor-pointer hover:bg-muted/80 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-blue-500 shrink-0" />
-          <div className="hidden md:block ml-3 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">Trader 0x7B</p>
-            <p className="text-xs text-primary truncate">Pro Plan</p>
+        <Link to="/profile" className="block w-10 h-10 md:w-full md:h-auto rounded-xl bg-muted p-2 flex items-center justify-center md:justify-start cursor-pointer hover:bg-muted/80 transition-colors">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-blue-500 shrink-0 flex items-center justify-center">
+            <User className="w-4 h-4 text-white" />
           </div>
-        </div>
+          <div className="hidden md:block ml-3 overflow-hidden">
+            <p className="text-sm font-medium text-white truncate">My Profile</p>
+            <p className="text-xs text-primary truncate">View Details</p>
+          </div>
+        </Link>
       </div>
     </div>
   );

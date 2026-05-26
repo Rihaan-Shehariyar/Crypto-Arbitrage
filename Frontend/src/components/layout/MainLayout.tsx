@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   Radar,
   LogOut,
+  User,
 } from 'lucide-react';
 
 import {
@@ -280,6 +281,20 @@ export function MainLayout({
             title="Transactions"
           >
             <ArrowLeftRight className="w-6 h-6" />
+          </Link>
+
+          <Link
+            to="/profile"
+            className={cn(
+              'p-3 rounded-xl transition-all duration-300 group',
+
+              isActive('/profile')
+                ? 'bg-primary/10 text-primary shadow-[0_0_15px_rgba(94,234,212,0.15)]'
+                : 'text-muted-foreground hover:bg-surface hover:text-white',
+            )}
+            title="Profile"
+          >
+            <User className="w-6 h-6" />
           </Link>
 
         </nav>

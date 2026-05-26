@@ -8,6 +8,7 @@ import Dashboard from '@/pages/Dashboard';
 import Portfolio from '@/pages/Portfolio';
 import Transactions from '@/pages/Transactions';
 import Opportunities from '@/pages/Opportunities';
+import Profile from '@/pages/Profile';
 import Login from '@/pages/Login';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -44,6 +45,7 @@ function App() {
                   <Route path="/opportunities" element={<Opportunities />} />
                   <Route path="/portfolio" element={<Portfolio />} />
                   <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/profile" element={<Profile />} />
                 </Routes>
               </MainLayout>
             </WebSocketProvider>

@@ -5,6 +5,7 @@ import type {
   InventoryResponse,
   Trade,
   LoginResponse,
+  UserProfile,
 } from "@/types/api";
 
 export const login = async (credentials: Record<string, string>): Promise<LoginResponse> => {
@@ -14,6 +15,11 @@ export const login = async (credentials: Record<string, string>): Promise<LoginR
 
 export const register = async (userData: Record<string, string>): Promise<{ message: string }> => {
   const response = await apiClient.post<{ message: string }>('/register', userData);
+  return response.data;
+};
+
+export const getMe = async (): Promise<UserProfile> => {
+  const response = await apiClient.get<UserProfile>('/me');
   return response.data;
 };
 

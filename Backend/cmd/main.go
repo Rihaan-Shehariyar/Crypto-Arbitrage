@@ -275,6 +275,10 @@ func main() {
 		),
 	)
 
+	authGroup.GET("/me",
+		handler.MeHandler,
+	)
+
 	authGroup.GET(
 		"/paper/balance",
 		handler.GetPaperBalance,
