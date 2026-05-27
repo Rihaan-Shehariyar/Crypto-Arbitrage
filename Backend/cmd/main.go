@@ -316,7 +316,7 @@ func main() {
 	authGroup.POST(
 		"/trading/start",
 		handler.StartTradingHandler,
-	)       
+	)        
 
 	authGroup.POST(
 		"/trading/stop",
