@@ -1,27 +1,79 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-interface AuthState {
-  token: string | null;
-  subscriptionActive: boolean;
-  setToken: (token: string) => void;
-  setSubscriptionActive: (active: boolean) => void;
-  logout: () => void;
-  isAuthenticated: () => boolean;
+interface User {
+
+  id: string
+
+  name: string
+
+  email: string
+
+  subscription_active: boolean
+
+  trading_enabled: boolean
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      token: null,
-      subscriptionActive: false,
-      setToken: (token) => set({ token }),
-      setSubscriptionActive: (subscriptionActive) => set({ subscriptionActive }),
-      logout: () => set({ token: null, subscriptionActive: false }),
-      isAuthenticated: () => !!get().token,
-    }),
-    {
-      name: 'arbitra-auth',
-    }
+interface AuthState {
+
+  token: string | null
+
+  user: User | null
+
+  hydrated: boolean
+
+  setToken: (
+    token: string | null,
+  ) => void
+
+  setUser: (
+    user: User | null,
+  ) => void
+
+  setHydrated: (
+    hydrated: boolean,
+  ) => void
+
+  logout: () => void
+}
+
+export const useAuthStore =
+  create<AuthState>()(
+
+    persist(
+
+      (set) => ({
+
+        token: null,
+
+        user: null,
+
+        hydrated: false,
+
+        setToken: (token) =>
+          set({ token }),
+
+        setUser: (user) =>
+          set({ user }),
+
+        setHydrated: (
+          hydrated,
+        ) =>
+          set({ hydrated }),
+
+        logout: () =>
+          set({
+
+            token: null,
+
+            user: null,
+
+            hydrated: false,
+          }),
+      }),
+
+      {
+        name: 'arbitra-auth',
+      },
+    ),
   )
-);

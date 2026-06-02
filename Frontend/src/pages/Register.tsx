@@ -18,7 +18,10 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const setToken = useAuthStore((state) => state.setToken);
-  const setSubscriptionActive = useAuthStore((state) => state.setSubscriptionActive);
+const setUser =
+  useAuthStore(
+    (state) => state.setUser,
+  );
   const navigate = useNavigate();
 
   const loadingTexts = [
@@ -80,10 +83,33 @@ export default function Register() {
       await new Promise((resolve) => setTimeout(resolve, 350));
 
       setToken(loginRes.token);
-      setSubscriptionActive(loginRes.subscription_active === true);
-      
-      toast.success('SECURE TRADING PROFILE INSTANTIATED');
-      navigate('/pricing');
+   setToken(
+  loginRes.token,
+)
+
+setUser(
+  loginRes.user,
+)
+
+toast.success(
+  'SECURE TRADING PROFILE INSTANTIATED',
+)
+
+if (
+  loginRes.user
+    .subscription_active
+) {
+
+  navigate(
+    "/dashboard",
+  )
+
+} else {
+
+  navigate(
+    "/pricing",
+  )
+}
     } catch (error) {
       clearInterval(stepInterval);
       if (isAxiosError(error)) {
@@ -314,20 +340,33 @@ export default function Register() {
                     credentialResponse.credential,
                 },
               )
+setToken(
+  res.data.token,
+)
 
-            setToken(
-              res.data.token,
-            )
+setUser(
+  res.data.user,
+)
 
-            setSubscriptionActive(
-              false,
-            )
+toast.success(
+  "GOOGLE PROFILE REGISTERED",
+)
 
-            toast.success(
-              "GOOGLE PROFILE REGISTERED",
-            )
+if (
+  res.data.user
+    .subscription_active
+) {
 
-            navigate("/pricing")
+  navigate(
+    "/dashboard",
+  )
+
+} else {
+
+  navigate(
+    "/pricing",
+  )
+}
 
           } catch (err) {
 

@@ -1,6 +1,6 @@
 export interface LoginResponse {
   token: string;
-  subscription_active?: boolean;
+  user: UserProfile;
 }
 
 export interface UserProfile {

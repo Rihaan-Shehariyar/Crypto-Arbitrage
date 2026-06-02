@@ -1,25 +1,92 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from '@/store/useAuthStore';
+import React from 'react'
 
-interface ProtectedSubscriptionRouteProps {
-  children: React.ReactNode;
+import {
+  Navigate,
+  useLocation,
+} from 'react-router-dom'
+
+import {
+  useAuthStore,
+} from '@/store/useAuthStore'
+
+interface Props {
+
+  children: React.ReactNode
 }
 
-export function ProtectedSubscriptionRoute({ children }: ProtectedSubscriptionRouteProps) {
-  const token = useAuthStore((state) => state.token);
-  const subscriptionActive = useAuthStore((state) => state.subscriptionActive);
-  const location = useLocation();
+export function
+ProtectedSubscriptionRoute({
+
+  children,
+
+}: Props) {
+
+  const token =
+    useAuthStore(
+      (state) => state.token,
+    )
+
+  const user =
+    useAuthStore(
+      (state) => state.user,
+    )
+
+  const hydrated =
+    useAuthStore(
+      (state) => state.hydrated,
+    )
+
+  const location =
+    useLocation()
+
+  if (!hydrated) {
+
+    return (
+
+      <div
+        className="
+          min-h-screen
+          bg-black
+          flex
+          items-center
+          justify-center
+          text-primary
+          font-mono
+        "
+      >
+        INITIALIZING SESSION...
+      </div>
+    )
+  }
 
   if (!token) {
-    // Save the page they were trying to access so we can redirect them back after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+
+    return (
+      <Navigate
+
+        to="/login"
+
+        state={{
+          from: location,
+        }}
+
+        replace
+      />
+    )
   }
 
-  if (!subscriptionActive) {
-    // Redirect authenticated but unsubscribed users to pricing
-    return <Navigate to="/pricing" replace />;
+  if (
+    user &&
+    !user.subscription_active
+  ) {
+
+    return (
+      <Navigate
+        to="/pricing"
+        replace
+      />
+    )
   }
 
-  return <>{children}</>;
+  return <>{children}</>
 }
