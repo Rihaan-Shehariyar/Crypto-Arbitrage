@@ -440,7 +440,7 @@ if (
             )}
           </AnimatePresence>
 
-          <div className="mt-6 pt-6 border-t border-border/50 text-center">
+          <div className="mt-6 pt-6 border-t border-border/50 text-center"> 
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
               Already have credentials?{' '}
               <Link to="/login" className="text-primary hover:underline font-bold">
