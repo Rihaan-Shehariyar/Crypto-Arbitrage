@@ -1,4 +1,3 @@
-
 package kafka
 
 import (
@@ -98,7 +97,9 @@ func (c *Consumer) Start() {
 		// PUBLISH EVENT
 		// -----------------------------------
 
-		events.Bus <- events.Event{
+		select {
+
+		case events.Bus <- events.Event{
 
 			Type: "ORDERBOOK",
 
@@ -110,6 +111,13 @@ func (c *Consumer) Start() {
 
 				OrderBook: ob,
 			},
+		}:
+
+		default:
+
+			log.Println(
+				"[EVENT BUS] dropped event",
+			)
 		}
 		now := time.Now().UnixMilli()
 		if obMsg.ReceivedAt > 0 {
@@ -130,12 +138,12 @@ func (c *Consumer) Start() {
 				float64(kafkaLatency),
 			)
 
-		log.Printf(
-			"[LATENCY] kafka=%dms %s %s",
-			kafkaLatency,
-			obMsg.Exchange,
-			obMsg.Symbol,
-		)
+		// log.Printf(
+		// 	"[LATENCY] kafka=%dms %s %s",
+		// 	kafkaLatency,
+		// 	obMsg.Exchange,
+		// 	obMsg.Symbol,
+		// )
 
 	}
 }

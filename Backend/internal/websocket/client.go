@@ -2,8 +2,18 @@ package websocket
 
 import (
 	"log"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	writeWait = 10 * time.Second
+
+	pongWait = 60 * time.Second
+
+	pingPeriod = (pongWait * 9) / 10
 )
 
 type Client struct {
@@ -12,31 +22,107 @@ type Client struct {
 	Send chan []byte
 
 	UserID string
+
+	once sync.Once
+}
+
+func (c *Client) Close() {
+
+	c.once.Do(func() {
+
+		close(c.Send)
+
+		c.Conn.Close()
+	})
 }
 
 // -----------------------------------
 // WRITE PUMP
 // -----------------------------------
-
 func (c *Client) WritePump() {
 
-	defer c.Conn.Close()
-
-	for msg := range c.Send {
-
-		err := c.Conn.WriteMessage(
-			websocket.TextMessage,
-			msg,
+	ticker :=
+		time.NewTicker(
+			pingPeriod,
 		)
 
-		if err != nil {
+	defer func() {
 
-			log.Println(
-				"[WS] write error:",
-				err,
+		ticker.Stop()
+
+		c.Close()
+	}()
+
+	for {
+
+		select {
+
+		// -----------------------------------
+		// SEND MESSAGE
+		// -----------------------------------
+
+		case msg, ok :=
+			<-c.Send:
+
+			c.Conn.SetWriteDeadline(
+				time.Now().Add(
+					writeWait,
+				),
 			)
 
-			return
+			if !ok {
+
+				c.Conn.WriteMessage(
+					websocket.CloseMessage,
+					[]byte{},
+				)
+
+				return
+			}
+
+			err :=
+				c.Conn.WriteMessage(
+					websocket.TextMessage,
+					msg,
+				)
+
+			if err != nil {
+
+				log.Println(
+					"[WS] write error:",
+					err,
+				)
+
+				return
+			}
+
+		// -----------------------------------
+		// HEARTBEAT PING
+		// -----------------------------------
+
+		case <-ticker.C:
+
+			c.Conn.SetWriteDeadline(
+				time.Now().Add(
+					writeWait,
+				),
+			)
+
+			err :=
+				c.Conn.WriteMessage(
+					websocket.PingMessage,
+					nil,
+				)
+
+			if err != nil {
+
+				log.Println(
+					"[WS] ping failed:",
+					err,
+				)
+
+				return
+			}
 		}
 	}
 }

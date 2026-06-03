@@ -18,9 +18,6 @@ const (
 )
 
 var (
-	mu          sync.RWMutex
-	lastRun     = make(map[string]int64)
-	lastPrint   = make(map[string]int64)
 	CurrentMode = Cross
 	Simulate    = true
 )
@@ -49,6 +46,14 @@ func StartEngine(
 		"[ENGINE] started for user %s",
 		userID,
 	)
+
+	lastRun :=
+		make(map[string]int64)
+
+	lastPrint :=
+		make(map[string]int64)
+
+	var mu sync.RWMutex
 
 	for {
 

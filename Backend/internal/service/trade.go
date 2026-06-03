@@ -23,6 +23,7 @@ type Trade struct {
 var (
 	trades []Trade
 	mut     sync.Mutex
+    mu sync.RWMutex
 )
 
 func AddTrade(t Trade) {

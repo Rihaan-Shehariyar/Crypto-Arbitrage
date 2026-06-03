@@ -4,13 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+
+		origin :=
+			r.Header.Get("Origin")
+
+		return origin ==
+			"http://localhost:5173"
 	},
 }
 
@@ -59,6 +65,24 @@ func AddClient(
 
 		UserID: userID,
 	}
+	conn.SetReadDeadline(
+		time.Now().Add(
+			pongWait,
+		),
+	)
+
+	conn.SetPongHandler(
+		func(string) error {
+
+			conn.SetReadDeadline(
+				time.Now().Add(
+					pongWait,
+				),
+			)
+
+			return nil
+		},
+	)
 
 	mu.Lock()
 
@@ -86,9 +110,8 @@ func AddClient(
 
 			mu.Unlock()
 
-			close(client.Send)
+			client.Close()
 
-			conn.Close()
 		}()
 
 		for {
@@ -105,7 +128,6 @@ func AddClient(
 // -----------------------------------
 // GLOBAL BROADCAST
 // -----------------------------------
-
 func Broadcast(
 
 	eventType string,
@@ -127,35 +149,55 @@ func Broadcast(
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	// -----------------------------------
+	// COPY CLIENTS
+	// -----------------------------------
+
+	mu.RLock()
+
+	clients :=
+		make(
+			[]*Client,
+			0,
+			len(Clients),
+		)
 
 	for client := range Clients {
 
-		select {
+		clients =
+			append(
+				clients,
+				client,
+			)
+	}
 
-		// -----------------------------------
-		// NON-BLOCKING SEND
-		// -----------------------------------
+	mu.RUnlock()
+
+	// -----------------------------------
+	// BROADCAST OUTSIDE LOCK
+	// -----------------------------------
+
+	for _, client := range clients {
+
+		select {
 
 		case client.Send <- data:
 
-		// -----------------------------------
-		// CLIENT TOO SLOW
-		// -----------------------------------
-
 		default:
 
-			close(client.Send)
+			mu.Lock()
 
-			delete(Clients, client)
+			delete(
+				Clients,
+				client,
+			)
 
-			client.Conn.Close()
+			mu.Unlock()
+
+			client.Close()
 		}
 	}
 }
-
-
 
 // -----------------------------------
 // CLIENT COUNT
@@ -180,10 +222,7 @@ func CloseAll() {
 
 	for client := range Clients {
 
-		close(client.Send)
-
-		client.Conn.Close()
-
+		client.Close()
 		delete(Clients, client)
 	}
 }

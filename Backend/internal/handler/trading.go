@@ -62,6 +62,20 @@ func StartTradingHandler(
 	// ENABLE TRADING
 	// -----------------------------------
 
+	if service.EngineRunning(
+		user.ID,
+	) {
+
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "engine already running",
+			},
+		)
+
+		return
+	}
+
 	user.TradingEnabled = true
 
 	// -----------------------------------
@@ -220,6 +234,10 @@ func StopTradingHandler(
 	// -----------------------------------
 	// SUCCESS
 	// -----------------------------------
+
+	service.StopEngine(
+		user.ID,
+	)
 
 	c.JSON(
 		http.StatusOK,

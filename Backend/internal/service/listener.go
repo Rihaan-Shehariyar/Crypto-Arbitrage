@@ -50,11 +50,11 @@ func StartEventConsumer(
 					ob :=
 						event.Data.(events.OrderBookEvent)
 
-					log.Printf(
-						"[EVENT] ORDERBOOK %s %s",
-						ob.Exchange,
-						ob.Symbol,
-					)
+					// log.Printf(
+					// 	"[EVENT] ORDERBOOK %s %s",
+					// 	ob.Exchange,
+					// 	ob.Symbol,
+					// )
 
 					// -----------------------------------
 					// LOAD USERS
@@ -112,11 +112,11 @@ func StartEventConsumer(
 							QueuedAt: time.Now().UnixMilli(),
 						}:
 
-							log.Printf(
-								"[QUEUE] enqueued %s for %s",
-								ob.Symbol,
-								userID,
-							)
+							// log.Printf(
+							// 	"[QUEUE] enqueued %s for %s",
+							// 	ob.Symbol,
+							// 	userID,
+							// )
 
 						default:
 

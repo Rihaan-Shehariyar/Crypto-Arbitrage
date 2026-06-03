@@ -5,7 +5,6 @@ import "encoding/json"
 // -----------------------------------
 // PRIVATE BROADCAST
 // -----------------------------------
-
 func BroadcastToUser(
 
 	userID string,
@@ -29,8 +28,14 @@ func BroadcastToUser(
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	// -----------------------------------
+	// COPY TARGET CLIENTS
+	// -----------------------------------
+
+	mu.RLock()
+
+	clients :=
+		make([]*Client, 0)
 
 	for client := range Clients {
 
@@ -38,17 +43,37 @@ func BroadcastToUser(
 			continue
 		}
 
+		clients =
+			append(
+				clients,
+				client,
+			)
+	}
+
+	mu.RUnlock()
+
+	// -----------------------------------
+	// SEND OUTSIDE LOCK
+	// -----------------------------------
+
+	for _, client := range clients {
+
 		select {
 
 		case client.Send <- data:
 
 		default:
 
-			close(client.Send)
+			mu.Lock()
 
-			delete(Clients, client)
+			delete(
+				Clients,
+				client,
+			)
 
-			client.Conn.Close()
+			mu.Unlock()
+
+			client.Close()
 		}
 	}
 }

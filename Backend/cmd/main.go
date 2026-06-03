@@ -87,6 +87,7 @@ func main() {
 	// FEED
 
 	f := feed.NewFeed()
+	service.GlobalFeed = f
 
 	_ = f
 
@@ -170,6 +171,8 @@ func main() {
 	service.SetBrokers(
 		brokers,
 	)
+	service.GlobalBrokers =
+		brokers
 
 	log.Println(
 		"Brokers initialized",
@@ -210,6 +213,9 @@ func main() {
 	service.StartCrossWorkers(10)
 
 	service.StartEventConsumer(ctx)
+	go service.StartEngineManager(
+		ctx,
+	)
 	service.StartExchangeHealthMonitor()
 
 	// BALANCE WORKER
