@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -10,13 +11,21 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
+
 	CheckOrigin: func(r *http.Request) bool {
 
 		origin :=
-			r.Header.Get("Origin")
+			r.Header.Get(
+				"Origin",
+			)
+
+		allowed :=
+			os.Getenv(
+				"FRONTEND_ORIGIN",
+			)
 
 		return origin ==
-			"http://localhost:5173"
+			allowed
 	},
 }
 

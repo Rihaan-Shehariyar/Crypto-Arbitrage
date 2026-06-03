@@ -11,7 +11,10 @@ import (
 func getJWTKey() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		return []byte("super-secret-key")
+
+		panic(
+			"JWT_SECRET missing",
+		)
 	}
 	return []byte(secret)
 }
