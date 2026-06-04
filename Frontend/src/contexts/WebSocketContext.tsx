@@ -4,6 +4,9 @@ import type { WsMessage } from '@/types/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useMetricsStore } from '@/store/useMetricsStore';
+import {
+	WS_URL,
+} from '@/config/api'
 
 interface WebSocketContextType {
   isConnected: boolean;
@@ -41,7 +44,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }, 200);
 
     const connect = () => {
-      const wsUrl = `ws://127.0.0.1:8080/ws?token=${token}`;
+      const wsUrl = `${WS_URL}/ws?token=${token}`;
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {

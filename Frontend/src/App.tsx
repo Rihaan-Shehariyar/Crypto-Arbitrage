@@ -8,6 +8,9 @@ import {
 } from 'react-router-dom'
 
 import axios from 'axios'
+import {
+	API_URL,
+} from '@/config/api'
 
 import { MainLayout } from '@/components/layout/MainLayout'
 
@@ -96,7 +99,7 @@ function App() {
         const res =
           await axios.get(
 
-            "http://127.0.0.1:8080/me",
+            `${API_URL}/me`,
 
             {
               headers: {

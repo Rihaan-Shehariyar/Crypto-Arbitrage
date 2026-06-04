@@ -7,6 +7,9 @@ import { toast } from 'sonner';
 import axios, { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleLogin } from "@react-oauth/google";
+import {
+	API_URL,
+} from '@/config/api'
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -333,7 +336,7 @@ if (
             const res =
               await axios.post(
 
-                "http://127.0.0.1:8080/register/google",
+                `${API_URL}/register/google`,
 
                 {
                   token:

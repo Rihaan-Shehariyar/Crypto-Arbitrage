@@ -5,7 +5,9 @@ import {
   useLocation,
   Link,
 } from 'react-router-dom'
-
+import {
+	API_URL,
+} from '@/config/api'
 import {
   Activity,
 } from 'lucide-react'
@@ -432,7 +434,7 @@ export default function Login() {
                         const res =
                           await axios.post(
 
-                            "http://127.0.0.1:8080/login/google",
+                            `${API_URL}/login/google`,
 
                             {
                               token,

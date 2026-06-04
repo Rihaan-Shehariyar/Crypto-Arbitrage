@@ -9,6 +9,10 @@ import {
   User,
 } from 'lucide-react';
 
+
+import {
+	API_URL,
+} from '@/config/api'
 import {
   Link,
   useLocation,
@@ -67,7 +71,7 @@ export function MainLayout({
     const handleUnload = () => {
 
       navigator.sendBeacon(
-        `http://127.0.0.1:8080/trading/stop?token=${token}`,
+        `${API_URL}/trading/stop?token=${token}`,
       );
     };
 
@@ -118,7 +122,7 @@ export function MainLayout({
             // -----------------------------------
 
             await fetch(
-              'http://127.0.0.1:8080/heartbeat',
+              `${API_URL}/heartbeat`,
               {
                 method: 'POST',
 
