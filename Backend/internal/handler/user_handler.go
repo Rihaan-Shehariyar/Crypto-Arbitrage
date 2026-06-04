@@ -39,6 +39,8 @@ func MeHandler(
 
 			"email": user.Email,
 
+			"role": user.Role,
+
 			"subscription_active": user.SubscriptionActive,
 
 			"trading_enabled": user.TradingEnabled,

@@ -15,8 +15,9 @@ import { activateSubscription } from '@/api/subscription';
 
 export default function Pricing() {
   const token = useAuthStore((state) => state.token);
-  const subscriptionActive = useAuthStore((state) => state.subscriptionActive);
-  const setSubscriptionActive = useAuthStore((state) => state.setSubscriptionActive);
+  const subscriptionActive = useAuthStore((state) => state.user?.subscription_active);
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
   
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,7 +69,9 @@ export default function Pricing() {
       if (res.success) {
         setPayStep(4);
         setShowSuccess(true);
-        setSubscriptionActive(true);
+        if (user) {
+          setUser({ ...user, subscription_active: true });
+        }
         await new Promise((resolve) => setTimeout(resolve, 1500));
         setIsModalOpen(false);
         toast.success('Pro Terminal Access provisioned successfully!');

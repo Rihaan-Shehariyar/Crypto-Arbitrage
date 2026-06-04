@@ -6,13 +6,11 @@ import (
 )
 
 var (
-
 	engineMu sync.Mutex
 
-	activeEngines =
-		make(
-			map[string]context.CancelFunc,
-		)
+	activeEngines = make(
+		map[string]context.CancelFunc,
+	)
 )
 
 func RegisterEngine(
@@ -73,4 +71,15 @@ func EngineRunning(
 		activeEngines[userID]
 
 	return exists
+}
+
+
+func EngineCount() int {
+
+	engineMu.Lock()
+	defer engineMu.Unlock()
+
+	return len(
+		activeEngines,
+	)
 }

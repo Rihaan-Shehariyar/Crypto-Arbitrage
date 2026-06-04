@@ -14,6 +14,7 @@ import (
 	"crypto-arbitrage/internal/paper"
 	"crypto-arbitrage/internal/recovery"
 	"crypto-arbitrage/internal/redis"
+	"crypto-arbitrage/internal/seeder"
 	"crypto-arbitrage/internal/service"
 	"crypto-arbitrage/internal/websocket"
 	"log"
@@ -47,6 +48,8 @@ func main() {
 		&inventory.Inventory{},
 		&opportunity.Opportunity{},
 	)
+
+	seeder.SeedAdmin()
 
 	err := inventory.LoadInventories()
 
@@ -350,6 +353,50 @@ func main() {
 	authGroup.POST(
 		"/heartbeat",
 		handler.HeartbeatHandler,
+	)
+
+	// ADMIN
+
+	admin := r.Group("/admin")
+
+	admin.Use(
+		auth.AuthMiddleware(),
+		auth.AdminMiddleware(),
+	)
+
+	admin.GET(
+		"/stats",
+		handler.AdminStatsHandler,
+	)
+
+	admin.GET(
+		"/users",
+		handler.AdminUsersHandler,
+	)
+
+	admin.GET(
+		"/users/:id",
+		handler.AdminUserHandler,
+	)
+
+	admin.POST(
+		"/users/:id/activate-subscription",
+		handler.AdminActivateSubscriptionHandler,
+	)
+
+	admin.POST(
+		"/users/:id/deactivate-subscription",
+		handler.AdminDeactivateSubscriptionHandler,
+	)
+
+	admin.GET(
+		"/system",
+		handler.AdminSystemHandler,
+	)
+
+	admin.GET(
+		"/users/:id/trades",
+		handler.AdminUserTradesHandler,
 	)
 
 	// SERVER

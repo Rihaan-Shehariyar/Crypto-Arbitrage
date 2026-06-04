@@ -21,7 +21,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 
 export default function Landing() {
   const token = useAuthStore((state) => state.token);
-  const subscriptionActive = useAuthStore((state) => state.subscriptionActive);
+  const subscriptionActive = useAuthStore((state) => state.user?.subscription_active);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
 

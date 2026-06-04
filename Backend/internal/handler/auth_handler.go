@@ -74,10 +74,16 @@ func LoginHandler(c *gin.Context) {
 	c.JSON(
 		http.StatusOK,
 		gin.H{
-
 			"token": token,
 
-			"subscription_active": user.SubscriptionActive,
+			"user": gin.H{
+				"id":                  user.ID,
+				"name":                user.Name,
+				"email":               user.Email,
+				"role":                user.Role,
+				"subscription_active": user.SubscriptionActive,
+				"trading_enabled":     user.TradingEnabled,
+			},
 		},
 	)
 }
@@ -423,15 +429,15 @@ func GoogleLogin(
 	c.JSON(
 		http.StatusOK,
 		gin.H{
-
 			"token": token,
 
-			"subscription_active": user.SubscriptionActive,
-
 			"user": gin.H{
-				"id":    user.ID,
-				"name":  user.Name,
-				"email": user.Email,
+				"id":                  user.ID,
+				"name":                user.Name,
+				"email":               user.Email,
+				"role":                user.Role,
+				"subscription_active": user.SubscriptionActive,
+				"trading_enabled":     user.TradingEnabled,
 			},
 		},
 	)

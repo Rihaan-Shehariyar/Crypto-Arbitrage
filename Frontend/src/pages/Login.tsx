@@ -138,35 +138,44 @@ export default function Login() {
           ),
       )
 
-      setToken(
-        res.token,
-      )
+     setToken(
+  res.token,
+)
 
-      setUser(
-        res.user,
-      )
+setUser(
+  res.user,
+)
 
-      toast.success(
-        'Access terminal unlocked.',
-      )
+toast.success(
+  'Access terminal unlocked.',
+)
 
-      if (
-        res.user
-          .subscription_active
-      ) {
+if (
+  res.user.role === "admin"
+) {
 
-        navigate(
-          '/dashboard',
-        )
+  navigate(
+    "/admin/dashboard",
+  )
 
-      } else {
+  return
+}
 
-        navigate(
-          redirectPath ||
-          '/pricing',
-        )
-      }
+if (
+  res.user.subscription_active
+) {
 
+  navigate(
+    "/dashboard",
+  )
+
+} else {
+
+  navigate(
+    redirectPath ||
+    "/pricing",
+  )
+}
     } catch (error) {
 
       clearInterval(
@@ -434,7 +443,7 @@ export default function Login() {
                         const res =
                           await axios.post(
 
-                            `${API_URL}/login/google`,
+                            `${API_URL}/auth/google`,
 
                             {
                               token,
@@ -453,21 +462,24 @@ export default function Login() {
                           "Google authentication success",
                         )
 
-                        if (
-                          res.data.user
-                            .subscription_active
-                        ) {
+        if (
+  res.data.user.role === "admin"
+) {
 
-                          navigate(
-                            "/dashboard",
-                          )
+navigate("/admin/dashboard")
+  return
+}
 
-                        } else {
+if (
+  res.data.user.subscription_active
+) {
 
-                          navigate(
-                            "/pricing",
-                          )
-                        }
+  navigate("/dashboard")
+
+} else {
+
+  navigate("/pricing")
+}
 
                       } catch (err) {
 

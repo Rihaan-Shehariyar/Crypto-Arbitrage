@@ -28,6 +28,16 @@ import Opportunities from '@/pages/Opportunities'
 import Profile from '@/pages/Profile'
 import Login from '@/pages/Login'
 
+// Admin pages and components
+import AdminLogin from '@/pages/admin/Login'
+import AdminLayout from '@/components/layout/AdminLayout'
+import AdminDashboard from '@/pages/admin/Dashboard'
+import AdminUsers from '@/pages/admin/Users'
+import AdminUserDetails from '@/pages/admin/UserDetails'
+import AdminSystemHealth from '@/pages/admin/SystemHealth'
+import {
+  ProtectedAdminRoute,
+} from '@/components/auth/ProtectedAdminRoute'
 import {
   useAuthStore,
 } from '@/store/useAuthStore'
@@ -40,13 +50,36 @@ function RootRoute() {
 
   const token =
     useAuthStore(
-      (state) => state.token,
+      state => state.token,
     )
 
   const user =
     useAuthStore(
-      (state) => state.user,
+      state => state.user,
     )
+
+  console.log(
+    "TOKEN:",
+    token,
+  )
+
+  console.log(
+    "USER:",
+    user,
+  )
+
+  if (
+    token &&
+    user?.role === "admin"
+  ) {
+
+    return (
+      <Navigate
+        to="/admin/dashboard"
+        replace
+      />
+    )
+  }
 
   if (
     token &&
@@ -109,7 +142,14 @@ function App() {
               },
             },
           )
+console.log(
+  "ME RESPONSE:",
+  res.data,
+)
 
+setUser(
+  res.data,
+)
         setUser(
           res.data,
         )
@@ -161,6 +201,50 @@ function App() {
         <Route
           path="/register"
           element={<Register />}
+        />
+
+        {/* ADMIN ROUTES */}
+
+        <Route
+          path="/admin/login"
+          element={<AdminLogin />}
+        />
+
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedAdminRoute>
+              <AdminLayout>
+                <Routes>
+                  <Route
+                    path="/dashboard"
+                    element={<AdminDashboard />}
+                  />
+                  <Route
+                    path="/users"
+                    element={<AdminUsers />}
+                  />
+                  <Route
+                    path="/users/:id"
+                    element={<AdminUserDetails />}
+                  />
+                  <Route
+                    path="/system"
+                    element={<AdminSystemHealth />}
+                  />
+                  <Route
+                    path="*"
+                    element={
+                      <Navigate
+                        to="/admin/dashboard"
+                        replace
+                      />
+                    }
+                  />
+                </Routes>
+              </AdminLayout>
+            </ProtectedAdminRoute>
+          }
         />
 
         {/* PROTECTED */}

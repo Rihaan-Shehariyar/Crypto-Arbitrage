@@ -7,9 +7,11 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  role: string;
   subscription_active: boolean;
   trading_enabled: boolean;
   auth_provider: string;
+  
 }
 
 export interface PortfolioSummary {
