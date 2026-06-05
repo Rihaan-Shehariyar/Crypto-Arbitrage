@@ -3,6 +3,7 @@
 <head>
     <title>Arbitrage Dashboard</title>
 
+
     <style>
         body {
             margin: 0;
@@ -119,7 +120,7 @@
 let fullList = [];
 
 function connectWS() {
-    const ws = new WebSocket("ws://localhost:8080/ws");
+const ws = new WebSocket("ws://13.48.203.193:8080/ws");
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
