@@ -16,7 +16,7 @@ services:
       - "5173:5173"
 
     environment:
-      VITE_API_URL: http://13.48.203.193:8080
+      VITE_API_URL: http://13.63.245.187:8080
 
     depends_on:
       - backend
