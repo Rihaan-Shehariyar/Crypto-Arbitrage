@@ -5,9 +5,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
 server: {
-    allowedHosts: [
-      "arbitra.duckdns.org"
-    ]
+   allowedHosts: true
   },
   plugins: [react()],
   resolve: {
