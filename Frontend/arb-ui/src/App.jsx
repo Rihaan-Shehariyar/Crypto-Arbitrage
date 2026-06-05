@@ -1,9 +1,10 @@
 import useWebSocket from "./useWebSocket";
 import useBalance from "./useBalance";
 import Dashboard from "./components/Dashboard";
+import { WS_URL } from "@/config/api";
 
 function App() {
-  const { prices, opportunities, logs } = useWebSocket("ws://localhost:8080/ws");
+  const { prices, opportunities, logs } = useWebSocket(`${WS_URL}/ws`);
   const balance = useBalance();
 
   return (

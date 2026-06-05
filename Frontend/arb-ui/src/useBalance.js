@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "@/config/api";
 
 export default function useBalance() {
 
@@ -15,7 +16,7 @@ export default function useBalance() {
         const token = localStorage.getItem("token");
 
         const res = await fetch(
-          "http://localhost:8080/balance",
+          `${API_URL}/balance`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
