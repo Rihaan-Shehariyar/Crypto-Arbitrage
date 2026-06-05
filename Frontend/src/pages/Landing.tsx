@@ -1,36 +1,63 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Activity, 
-  ChevronRight, 
-  Terminal, 
-  Radar, 
-  ShieldCheck, 
-  Coins, 
-  Lock, 
+import {
+  Activity,
+  ChevronRight,
+  Radar,
+  ShieldCheck,
+  Coins,
+  Lock,
   Layers,
-  Database,
   Cpu,
   Menu,
-  X
+  X,
+  TrendingUp,
+  ArrowRight,
+  BarChart2,
+  Zap,
+  Globe,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { stopTrading } from '@/services/endpoints';
 import { useSessionStore } from '@/store/useSessionStore';
 
+// ── Check icon ─────────────────────────────────────────────────────────
+function Check({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
 export default function Landing() {
-  const token = useAuthStore((state) => state.token);
-  const subscriptionActive = useAuthStore((state) => state.user?.subscription_active);
-  const logout = useAuthStore((state) => state.logout);
-  const navigate = useNavigate();
+  const token               = useAuthStore((s) => s.token);
+  const subscriptionActive  = useAuthStore((s) => s.user?.subscription_active);
+  const logout              = useAuthStore((s) => s.logout);
+  const navigate            = useNavigate();
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Live telemetry counters
+  const [ticksCount,         setTicksCount]         = useState(1_482_910);
+  const [avgLatency,         setAvgLatency]         = useState(12.4);
+  const [opportunitySpread,  setOpportunitySpread]  = useState(1.85);
+
+  useEffect(() => {
+    const t1 = setInterval(() => {
+      setTicksCount(p => p + Math.floor(Math.random() * 5) + 1);
+    }, 400);
+    const t2 = setInterval(() => {
+      setAvgLatency(p   => parseFloat(Math.max(9.2,  Math.min(14.8, p + (Math.random() - 0.5) * 0.4)).toFixed(1)));
+      setOpportunitySpread(p => parseFloat(Math.max(0.8, Math.min(3.5, p + (Math.random() - 0.5) * 0.1)).toFixed(2)));
+    }, 2000);
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, []);
 
   const handleLogout = async () => {
-    try {
-      await stopTrading();
-    } catch (err) {
-      console.error('Failed to stop trading during landing logout:', err);
-    } finally {
+    try { await stopTrading(); } catch {}
+    finally {
       useSessionStore.getState().stopSession();
       useSessionStore.getState().resetSessionMetrics();
       logout();
@@ -38,219 +65,157 @@ export default function Landing() {
     }
   };
 
-  // Mobile navbar collapse state
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Live telemetry counters
-  const [ticksCount, setTicksCount] = useState(1482910);
-  const [avgLatency, setAvgLatency] = useState(12.4);
-  const [opportunitySpread, setOpportunitySpread] = useState(1.85);
-
-  useEffect(() => {
-    const tickInterval = setInterval(() => {
-      setTicksCount((prev) => prev + Math.floor(Math.random() * 5) + 1);
-    }, 400);
-
-    const metricsInterval = setInterval(() => {
-      setAvgLatency((prev) => {
-        const change = (Math.random() - 0.5) * 0.4;
-        return parseFloat(Math.max(9.2, Math.min(14.8, prev + change)).toFixed(1));
-      });
-      setOpportunitySpread((prev) => {
-        const change = (Math.random() - 0.5) * 0.1;
-        return parseFloat(Math.max(0.8, Math.min(3.5, prev + change)).toFixed(2));
-      });
-    }, 2000);
-
-    return () => {
-      clearInterval(tickInterval);
-      clearInterval(metricsInterval);
-    };
-  }, []);
-
-
-
-  const scrollToSection = (id: string) => {
-    setIsMobileMenuOpen(false);
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+  const scrollTo = (id: string) => {
+    setMobileOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // ── Reusable feature card ──
+  const FeatureCard = ({
+    icon: Icon,
+    num,
+    title,
+    desc,
+  }: {
+    icon: React.ElementType;
+    num: string;
+    title: string;
+    desc: string;
+  }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4 }}
+      className="bg-white border border-[#e5e7eb] rounded-2xl p-6 hover:shadow-lg hover:border-[#f4a622]/30 transition-all duration-300 group"
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-[#f4a622]/10 border border-[#f4a622]/20 flex items-center justify-center group-hover:bg-[#f4a622]/15 transition-colors">
+          <Icon className="w-5 h-5 text-[#f4a622]" />
+        </div>
+        <span className="text-xs font-bold text-[#6b7280] uppercase tracking-widest">{num}</span>
+      </div>
+      <h3 className="text-sm font-bold text-[#1f2937] mb-2">{title}</h3>
+      <p className="text-sm text-[#6b7280] leading-relaxed">{desc}</p>
+    </motion.div>
+  );
+
   return (
-    <div className="bg-[#050505] text-[#F3F4F6] min-h-screen font-mono relative overflow-x-hidden scroll-smooth">
-      {/* Background Grid Accent */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0F0F0F_1px,transparent_1px),linear-gradient(to_bottom,#0F0F0F_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] pointer-events-none" />
-      <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-primary/5 rounded-full filter blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-0 w-[30rem] h-[30rem] bg-blue-500/5 rounded-full filter blur-[120px] pointer-events-none" />
+    <div className="bg-[#f4f6f9] text-[#1f2937] min-h-screen font-sans overflow-x-hidden scroll-smooth">
 
-      {/* HEADER NAVBAR */}
-      <header className="border-b border-[#1A1A1A] bg-[#0A0A0A]/90 backdrop-blur-md sticky top-0 z-50">
+      {/* ════════════════════════════════════════════════════════
+          NAVBAR
+      ════════════════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#e5e7eb] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          
-          {/* Left Side: Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded bg-primary/10 border border-primary/30 flex items-center justify-center shadow-[0_0_15px_rgba(94,234,212,0.1)]">
-              <Activity className="text-primary w-5 h-5 animate-pulse" />
-            </div>
-            <span className="font-bold text-base sm:text-lg tracking-wider text-white">ARBITRA</span>
-            <span className="text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded tracking-widest font-bold">
-              PRO
-            </span>
-          </div>
 
-          {/* Center Navigation Links (smooth scroll) */}
-          <nav className="hidden md:flex items-center gap-8 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-            <button onClick={() => scrollToSection('features')} className="hover:text-primary transition-colors focus:outline-none">FEATURES</button>
-            <button onClick={() => scrollToSection('how-it-works')} className="hover:text-primary transition-colors focus:outline-none">HOW IT WORKS</button>
-            <button onClick={() => scrollToSection('pricing')} className="hover:text-primary transition-colors focus:outline-none">PRICING</button>
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#143b63' }}>
+              <Activity className="w-4 h-4 text-[#f4a622]" />
+            </div>
+            <span className="font-bold text-lg tracking-tight text-[#143b63]">Arbitra</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#f4a622]/10 text-[#f4a622] border border-[#f4a622]/25 uppercase tracking-wider">
+              Pro
+            </span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#6b7280]">
+            <button onClick={() => scrollTo('features')}    className="hover:text-[#143b63] transition-colors">Features</button>
+            <button onClick={() => scrollTo('how-it-works')} className="hover:text-[#143b63] transition-colors">How It Works</button>
+            <button onClick={() => scrollTo('pricing')}     className="hover:text-[#143b63] transition-colors">Pricing</button>
           </nav>
 
-          {/* Right Nav Actions */}
+          {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
             {!token ? (
               <>
-                <Link 
-                  to="/login" 
-                  className="text-muted-foreground hover:text-white px-3 py-1.5 border border-transparent hover:border-border rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                >
-                  Login
+                <Link to="/login"
+                  className="text-sm font-semibold text-[#6b7280] hover:text-[#143b63] px-4 py-2 rounded-lg hover:bg-[#f4f6f9] transition-colors">
+                  Sign In
                 </Link>
-                <Link 
-                  to="/register" 
-                  className="text-white hover:text-primary border border-[#222] hover:border-primary px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300 hover:shadow-[0_0_10px_rgba(94,234,212,0.2)] bg-black/40"
-                >
+                <Link to="/register"
+                  className="text-sm font-semibold px-4 py-2 rounded-lg border border-[#e5e7eb] text-[#1f2937] hover:border-[#143b63]/30 hover:bg-white transition-colors">
                   Register
                 </Link>
-                <Link 
-                  to="/pricing" 
-                  className="bg-primary text-black hover:bg-primary/95 px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(94,234,212,0.15)] duration-300 hover:shadow-[0_0_20px_rgba(94,234,212,0.3)]"
-                >
-                  Upgrade
+                <Link to="/pricing"
+                  className="text-sm font-bold px-5 py-2 rounded-lg text-white transition-all hover:opacity-90 shadow-sm"
+                  style={{ background: '#f4a622' }}>
+                  Get Started
                 </Link>
               </>
             ) : !subscriptionActive ? (
               <>
-                <Link 
-                  to="/pricing" 
-                  className="text-muted-foreground hover:text-white px-3 py-1.5 border border-transparent hover:border-border rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                >
+                <Link to="/pricing"
+                  className="text-sm font-semibold text-[#6b7280] hover:text-[#143b63] px-4 py-2 rounded-lg hover:bg-[#f4f6f9] transition-colors">
                   Pricing
                 </Link>
-                <button 
-                  onClick={handleLogout}
-                  className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300"
-                >
-                  Logout
+                <button onClick={handleLogout}
+                  className="text-sm font-semibold px-4 py-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors">
+                  Sign Out
                 </button>
               </>
             ) : (
               <>
-                <Link 
-                  to="/dashboard" 
-                  className="bg-primary text-black hover:bg-primary/90 px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(94,234,212,0.15)] duration-300 hover:shadow-[0_0_20px_rgba(94,234,212,0.3)]"
-                >
-                  Dashboard
+                <Link to="/dashboard"
+                  className="text-sm font-bold px-5 py-2 rounded-lg text-white transition-all hover:opacity-90 shadow-sm"
+                  style={{ background: '#143b63' }}>
+                  Go to Dashboard
                 </Link>
-                <button 
-                  onClick={handleLogout}
-                  className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300"
-                >
-                  Logout
+                <button onClick={handleLogout}
+                  className="text-sm font-semibold px-4 py-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors">
+                  Sign Out
                 </button>
               </>
             )}
           </div>
 
-          {/* Mobile hamburger menu toggle */}
-          <div className="flex md:hidden">
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-              className="text-muted-foreground hover:text-white focus:outline-none"
-            >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
+          {/* Mobile toggle */}
+          <button onClick={() => setMobileOpen(o => !o)}
+            className="md:hidden p-2 rounded-lg text-[#6b7280] hover:bg-[#f4f6f9] transition-colors">
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
 
-        {/* Collapsible Mobile Menu */}
+        {/* Mobile menu */}
         <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div 
+          {mobileOpen && (
+            <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="md:hidden border-t border-[#1A1A1A] bg-[#0A0A0A] px-4 py-4 space-y-4 font-mono overflow-hidden"
+              transition={{ duration: 0.2 }}
+              className="md:hidden border-t border-[#e5e7eb] bg-white overflow-hidden"
             >
-              <div className="flex flex-col gap-3.5 text-xs text-muted-foreground uppercase tracking-widest font-semibold">
-                <button onClick={() => scrollToSection('features')} className="text-left py-1.5 hover:text-primary transition-colors">FEATURES</button>
-                <button onClick={() => scrollToSection('how-it-works')} className="text-left py-1.5 hover:text-primary transition-colors">HOW IT WORKS</button>
-                <button onClick={() => scrollToSection('pricing')} className="text-left py-1.5 hover:text-primary transition-colors">PRICING</button>
+              <div className="px-4 py-4 space-y-1">
+                <button onClick={() => scrollTo('features')}    className="w-full text-left px-3 py-2.5 text-sm font-medium text-[#6b7280] hover:text-[#143b63] hover:bg-[#f4f6f9] rounded-lg transition-colors">Features</button>
+                <button onClick={() => scrollTo('how-it-works')} className="w-full text-left px-3 py-2.5 text-sm font-medium text-[#6b7280] hover:text-[#143b63] hover:bg-[#f4f6f9] rounded-lg transition-colors">How It Works</button>
+                <button onClick={() => scrollTo('pricing')}     className="w-full text-left px-3 py-2.5 text-sm font-medium text-[#6b7280] hover:text-[#143b63] hover:bg-[#f4f6f9] rounded-lg transition-colors">Pricing</button>
               </div>
-
-              <div className="border-t border-[#222] my-2 pt-4 flex flex-col gap-2.5">
+              <div className="px-4 pb-4 pt-2 border-t border-[#e5e7eb] flex flex-col gap-2">
                 {!token ? (
                   <>
-                    <Link 
-                      to="/login" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full text-center text-muted-foreground hover:text-white py-2 border border-border rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Login
+                    <Link to="/login" onClick={() => setMobileOpen(false)}
+                      className="w-full text-center py-2.5 rounded-lg border border-[#e5e7eb] text-sm font-semibold text-[#6b7280] hover:bg-[#f4f6f9] transition-colors">
+                      Sign In
                     </Link>
-                    <Link 
-                      to="/register" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full text-center text-white hover:text-primary border border-border hover:border-primary py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300"
-                    >
-                      Register
+                    <Link to="/pricing" onClick={() => setMobileOpen(false)}
+                      className="w-full text-center py-2.5 rounded-lg text-sm font-bold text-white transition-all"
+                      style={{ background: '#f4a622' }}>
+                      Get Started
                     </Link>
-                    <Link 
-                      to="/pricing" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full text-center bg-primary text-black hover:bg-primary/90 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Upgrade
-                    </Link>
-                  </>
-                ) : !subscriptionActive ? (
-                  <>
-                    <Link 
-                      to="/pricing" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full text-center text-muted-foreground hover:text-white py-2 border border-border rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Pricing
-                    </Link>
-                    <button 
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-center bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300"
-                    >
-                      Logout
-                    </button>
                   </>
                 ) : (
                   <>
-                    <Link 
-                      to="/dashboard" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full text-center bg-primary text-black hover:bg-primary/90 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Dashboard
+                    <Link to="/dashboard" onClick={() => setMobileOpen(false)}
+                      className="w-full text-center py-2.5 rounded-lg text-sm font-bold text-white"
+                      style={{ background: '#143b63' }}>
+                      Go to Dashboard
                     </Link>
-                    <button 
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-center bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300"
-                    >
-                      Logout
+                    <button onClick={() => { setMobileOpen(false); handleLogout(); }}
+                      className="w-full text-center py-2.5 rounded-lg border border-rose-200 text-sm font-semibold text-rose-600">
+                      Sign Out
                     </button>
                   </>
                 )}
@@ -260,444 +225,490 @@ export default function Landing() {
         </AnimatePresence>
       </header>
 
-      {/* HERO SECTION */}
-      <section className="relative pt-16 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-r border-l border-[#141414]">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          <div className="lg:col-span-7 space-y-6">
-            {/* Live Indicator Chip */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-black/40 border border-[#222] font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span>Realtime Scanner: 14 exchanges connected</span>
-            </div>
+      {/* ════════════════════════════════════════════════════════
+          HERO
+      ════════════════════════════════════════════════════════ */}
+      <section className="relative pt-16 pb-20 overflow-hidden">
+        {/* Background shape */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full opacity-[0.07]"
+               style={{ background: 'radial-gradient(circle, #f4a622 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full opacity-[0.05]"
+               style={{ background: 'radial-gradient(circle, #143b63 0%, transparent 70%)' }} />
+        </div>
 
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white uppercase leading-[1.1] font-mono">
-              Realtime Crypto <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400 neon-text">
-                Arbitrage Monitor
-              </span>
-            </h1>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
-            <p className="text-xs sm:text-sm text-muted-foreground font-mono leading-relaxed max-w-xl uppercase tracking-wide">
-              Track cross-exchange price differences, simulate paper trades with live metrics, and monitor execution data through a single professional trading terminal workspace.
-            </p>
+            {/* Left: Copy */}
+            <div className="lg:col-span-6 space-y-7">
+              {/* Badge */}
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#e5e7eb] shadow-sm text-xs font-semibold text-[#6b7280]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live scanner — 14 exchanges connected
+                </div>
+              </motion.div>
 
-            {/* CTAs */}
-            <div className="flex flex-wrap gap-4 pt-2">
-              <Link
-                to="/register"
-                className="bg-primary text-black hover:bg-primary/95 px-6 py-3 rounded font-bold text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(94,234,212,0.2)] hover:shadow-[0_0_30px_rgba(94,234,212,0.3)] duration-300 flex items-center justify-center min-w-[140px] gap-1.5"
+              {/* Headline */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
+                <h1 className="text-4xl sm:text-5xl font-extrabold text-[#1f2937] leading-[1.1] tracking-tight">
+                  Professional
+                  <span className="block" style={{ color: '#143b63' }}>Crypto Arbitrage</span>
+                  <span className="block" style={{ color: '#f4a622' }}>Intelligence Platform</span>
+                </h1>
+              </motion.div>
+
+              <motion.p
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}
+                className="text-base text-[#6b7280] leading-relaxed max-w-lg"
               >
-                Get Started <ChevronRight className="w-4 h-4 text-black" />
-              </Link>
-              <Link
-                to="/login"
-                className="bg-[#0E0E0E] hover:bg-[#151515] border border-[#262626] hover:border-primary/50 text-white px-6 py-3 rounded font-bold text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center min-w-[120px]"
+                Monitor cross-exchange price spreads in real time, simulate paper trades with live metrics,
+                and track execution data through a single professional dashboard workspace.
+              </motion.p>
+
+              {/* CTAs */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex flex-wrap gap-3 pt-1"
               >
-                Login
-              </Link>
-              <Link
-                to="/pricing"
-                className="bg-[#050505] hover:bg-[#111] border border-primary/20 hover:border-primary text-primary px-6 py-3 rounded font-bold text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center min-w-[120px]"
-              >
-                Upgrade
-              </Link>
-            </div>
-
-            {/* Telemetry Grid */}
-            <div className="grid grid-cols-3 gap-4 border border-[#1A1A1A] bg-black/30 p-4 rounded mt-8">
-              <div className="space-y-1">
-                <span className="text-[9px] text-muted-foreground block uppercase tracking-wider">LATENCY TIMER</span>
-                <span className="text-sm sm:text-lg font-bold text-primary font-mono">{avgLatency} ms</span>
-              </div>
-              <div className="space-y-1 border-l border-[#1A1A1A] pl-4">
-                <span className="text-[9px] text-muted-foreground block uppercase tracking-wider">TICKS ANALYZED</span>
-                <span className="text-sm sm:text-lg font-bold text-white font-mono">{ticksCount.toLocaleString()}</span>
-              </div>
-              <div className="space-y-1 border-l border-[#1A1A1A] pl-4">
-                <span className="text-[9px] text-muted-foreground block uppercase tracking-wider">SPREAD RANGE</span>
-                <span className="text-sm sm:text-lg font-bold text-blue-400 font-mono">+{opportunitySpread}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Visual Console Graphic */}
-          <div className="lg:col-span-5 relative">
-            <div className="border border-border/80 bg-[#0F0F0F] rounded overflow-hidden shadow-2xl">
-              <div className="bg-[#161616] px-4 py-2 border-b border-border/70 flex items-center justify-between text-[10px] text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-bold tracking-wider">TERMINAL PREVIEW [LIVE_FEED]</span>
-                </div>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                </div>
-              </div>
-
-              <div className="p-4 font-mono text-[9px] leading-relaxed h-64 overflow-hidden space-y-2.5 text-muted-foreground">
-                <div className="text-primary font-semibold flex justify-between">
-                  <span>[MONITOR] GATEWAYS SYNCHRONIZED</span>
-                  <span className="text-white">SYS OK</span>
-                </div>
-                <div className="border-t border-[#1C1C1C] my-1" />
-                <div className="flex justify-between hover:text-white transition-colors duration-200">
-                  <span className="text-white">BTC/USDT SPREAD SCANNING</span>
-                  <span className="text-primary font-semibold">BINANCE → BYBIT (+1.48%)</span>
-                </div>
-                <div className="flex justify-between hover:text-white transition-colors duration-200">
-                  <span>↳ LATENCY SPEED</span>
-                  <span className="text-gray-400">11.8ms</span>
-                </div>
-                <div className="flex justify-between hover:text-white transition-colors duration-200">
-                  <span>↳ PAPER PROFIT EST</span>
-                  <span className="text-primary font-semibold">$124.50 USDT</span>
-                </div>
-                <div className="flex justify-between text-yellow-500 font-semibold">
-                  <span>[SHIELD] SLIPPAGE LIMIT CHECKS PASSING</span>
-                  <span>NORMAL</span>
-                </div>
-                <div className="flex justify-between text-[#888]">
-                  <span>[SYS] ACTIVE WORKSPACE LOGGED IN</span>
-                  <span>FEED_SYNC_ON</span>
-                </div>
-                <div className="flex justify-between text-primary font-semibold">
-                  <span>ETH/USDT SPREAD SCANNING</span>
-                  <span>OKX → KRAKEN (+0.95%)</span>
-                </div>
-                <div className="flex justify-between text-gray-500">
-                  <span>[WS] ACTIVE TELEMETRY LINKED</span>
-                  <span>SECURE</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Glowing Corner Badge */}
-            <div className="absolute -bottom-4 -right-4 bg-primary text-black font-black text-[9px] px-2 py-1 rounded tracking-widest uppercase border border-white/20 shadow-[0_0_15px_rgba(94,234,212,0.3)]">
-              PAPER MONITOR TERMINAL
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOW THE PLATFORM WORKS */}
-      <section id="how-it-works" className="py-20 bg-[#070707] border-t border-b border-[#141414]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center space-y-3 mb-16">
-            <h2 className="text-xs text-primary font-bold tracking-widest uppercase font-mono">FLOW ARCHITECTURE</h2>
-            <h3 className="text-xl sm:text-3xl font-bold uppercase tracking-tight text-white font-mono">How The Platform Works</h3>
-            <p className="text-[11px] text-muted-foreground uppercase max-w-xl mx-auto leading-relaxed tracking-wider font-mono">
-              Aggregating live exchange details into an intuitive paper execution layout.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-[#0A0A0A] border border-[#1A1A1A] p-6 rounded flex flex-col justify-between hover:border-primary/30 transition-all duration-300">
-              <div className="space-y-4">
-                <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center text-primary font-bold text-xs">
-                  01
-                </div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Continuous Price Monitoring</h4>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide leading-relaxed">
-                  Realtime exchange orderbooks are scanned to identify cross-exchange price differences.
-                </p>
-              </div>
-              <div className="pt-6 text-[10px] text-primary flex items-center gap-1 font-bold">
-                REALTIME SCAN <ChevronRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-
-            <div className="bg-[#0A0A0A] border border-[#1A1A1A] p-6 rounded flex flex-col justify-between hover:border-primary/30 transition-all duration-300">
-              <div className="space-y-4">
-                <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center text-primary font-bold text-xs">
-                  02
-                </div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Exposure & Slippage Simulation</h4>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide leading-relaxed">
-                  Safeguards calculate expected slippage and order weights before executing paper trades.
-                </p>
-              </div>
-              <div className="pt-6 text-[10px] text-primary flex items-center gap-1 font-bold">
-                RISK SHIELD <ChevronRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-
-            <div className="bg-[#0A0A0A] border border-[#1A1A1A] p-6 rounded flex flex-col justify-between hover:border-primary/30 transition-all duration-300">
-              <div className="space-y-4">
-                <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center text-primary font-bold text-xs">
-                  03
-                </div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Live Workspace Analytics</h4>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide leading-relaxed">
-                  Trades are executed as simulated runs, syncing active portfolio charts and balances instantly.
-                </p>
-              </div>
-              <div className="pt-6 text-[10px] text-primary flex items-center gap-1 font-bold">
-                WORKSPACE UPDATE <ChevronRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES SECTION */}
-      <section id="features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-l border-r border-[#141414]">
-        <div className="text-center space-y-3 mb-16">
-          <span className="text-xs text-primary font-bold tracking-widest uppercase font-mono">CORE SPECIFICATION</span>
-          <h2 className="text-xl sm:text-3xl font-bold uppercase text-white tracking-tight font-mono">Workspace Features</h2>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider max-w-lg mx-auto">
-            Believable, latency-focused quant monitoring details for cryptocurrency assets.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Card 1 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <Radar className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">01. Arbitrage Spread Scanner</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Continuously query orderbooks across major crypto venues. Filter and organize real-time opportunity spreads.
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">02. Paper Trading Engine</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Initiate simulated orders across exchange proxies. Verify latency indicators, fills, and spread payouts.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <Coins className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">03. Live Portfolio Tracking</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Monitor simulated asset allocations, leverage filters, and cumulative paper PnL updates instantly.
-            </p>
-          </div>
-
-          {/* Card 4 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">04. Exposure Risk Monitoring</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Protect mock strategies with standard concurrency safeguards and automated slippage warning alerts.
-            </p>
-          </div>
-
-          {/* Card 5 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <Terminal className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">05. Execution Feed</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Review structured JSON telemetry streams mapping execution latency, routing venues, and trade parameters.
-            </p>
-          </div>
-
-          {/* Card 6 */}
-          <div className="bg-[#0A0A0A] border border-border p-6 rounded relative overflow-hidden group hover:border-primary/45 transition-colors duration-300">
-            <div className="w-10 h-10 bg-primary/5 border border-primary/20 rounded flex items-center justify-center mb-4 text-primary group-hover:scale-105 transition-transform duration-300">
-              <Layers className="w-5 h-5" />
-            </div>
-            <h3 className="text-xs font-bold text-white uppercase mb-2 tracking-wider">06. Multi-Exchange Monitoring</h3>
-            <p className="text-[11px] text-muted-foreground uppercase leading-relaxed tracking-wide">
-              Query status indicators across active exchanges simultaneously to identify trading paths.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* SCREENSHOTS / LOCKED PREVIEW SECTION */}
-      <section id="previews" className="py-20 bg-[#070707] border-t border-b border-[#141414]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center space-y-3 mb-16">
-            <span className="text-xs text-primary font-bold tracking-widest uppercase font-mono">WORKSPACE ACCESS PREVIEWS</span>
-            <h2 className="text-xl sm:text-3xl font-bold uppercase text-white font-mono">Workspace Previews</h2>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider max-w-lg mx-auto font-mono">
-              Pro Terminal workspace sections locked behind active subscription deeds.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Opportunity Scanner Preview */}
-            <div className="bg-[#0B0B0B] border border-border rounded overflow-hidden shadow-xl relative group">
-              <div className="p-5 blur-[2.5px] pointer-events-none select-none">
-                <div className="flex justify-between items-center text-xs font-mono uppercase mb-4 border-b border-[#222] pb-2 text-muted-foreground">
-                  <span>🔍 OPPORTUNITY SCANNER (BTC/ETH)</span>
-                  <span className="text-primary font-bold">14 DETAILS</span>
-                </div>
-                <div className="space-y-2">
-                  <div className="bg-black/50 p-2.5 rounded border border-[#222] flex justify-between font-mono text-[10px]">
-                    <span className="text-white">BTC/USDT</span>
-                    <span className="text-primary">SPREAD: +1.64%</span>
-                    <span className="text-gray-400">11ms</span>
-                  </div>
-                  <div className="bg-black/50 p-2.5 rounded border border-[#222] flex justify-between font-mono text-[10px]">
-                    <span className="text-white">ETH/USDT</span>
-                    <span className="text-primary">SPREAD: +1.12%</span>
-                    <span className="text-gray-400">14ms</span>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute inset-0 bg-[#050505]/80 flex flex-col items-center justify-center p-6 text-center transition-all duration-300 group-hover:bg-[#050505]/85">
-                <div className="w-9 h-9 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(94,234,212,0.1)]">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <span className="font-bold text-[11px] uppercase tracking-widest text-white">OPPORTUNITY SCANNER</span>
-                <span className="text-[9px] text-[#A1A1AA] uppercase tracking-wider max-w-xs mt-1 block">
-                  Terminal subscription license required
-                </span>
-                <Link to="/pricing" className="mt-3.5 bg-primary text-black font-bold text-[9px] px-3.5 py-1.5 rounded uppercase tracking-widest hover:bg-primary/90 transition-all">
-                  Unlock Scanner
+                <Link to="/register"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 transition-all"
+                  style={{ background: '#f4a622' }}>
+                  Get Started Free <ChevronRight className="w-4 h-4" />
                 </Link>
-              </div>
-            </div>
-
-            {/* Live Metrics Dashboard Preview */}
-            <div className="bg-[#0B0B0B] border border-border rounded overflow-hidden shadow-xl relative group">
-              <div className="p-5 blur-[2.5px] pointer-events-none select-none">
-                <div className="flex justify-between items-center text-xs font-mono uppercase mb-4 border-b border-[#222] pb-2 text-muted-foreground">
-                  <span>📊 WORKSPACE PERFORMANCE ANALYTICS</span>
-                  <span className="text-blue-400 font-bold">MONITORING</span>
-                </div>
-                <div className="space-y-2">
-                  <div className="bg-black/50 p-3 rounded border border-[#222] flex justify-between font-mono text-[10px]">
-                    <span>NET VIRTUAL BALANCE</span>
-                    <span className="text-white font-bold">$42,910.45 USDT</span>
-                  </div>
-                  <div className="bg-black/50 p-3 rounded border border-[#222] flex justify-between font-mono text-[10px]">
-                    <span>SIMULATED PAPER TRADES</span>
-                    <span className="text-primary font-bold">2,108</span>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute inset-0 bg-[#050505]/80 flex flex-col items-center justify-center p-6 text-center transition-all duration-300 group-hover:bg-[#050505]/85">
-                <div className="w-9 h-9 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(94,234,212,0.1)]">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <span className="font-bold text-[11px] uppercase tracking-widest text-white">TRADING ANALYTICS TERMINAL</span>
-                <span className="text-[9px] text-[#A1A1AA] uppercase tracking-wider max-w-xs mt-1 block">
-                  Verify mock executions & balance graphs
-                </span>
-                <Link to="/pricing" className="mt-3.5 bg-primary text-black font-bold text-[9px] px-3.5 py-1.5 rounded uppercase tracking-widest hover:bg-primary/90 transition-all">
-                  Unlock Terminal
+                <Link to="/login"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-[#143b63] bg-white border border-[#e5e7eb] hover:border-[#143b63]/30 hover:shadow-sm transition-all">
+                  Sign In
                 </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+                <Link to="/pricing"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold hover:bg-white transition-all border border-[#e5e7eb] text-[#6b7280] hover:text-[#143b63]">
+                  View Pricing
+                </Link>
+              </motion.div>
 
-      {/* PRICING SECTION (Smooth scroll target) */}
-      <section id="pricing" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-l border-r border-[#141414]">
-        <div className="text-center space-y-3 mb-12">
-          <span className="text-xs text-primary font-bold tracking-widest uppercase font-mono">TERMINAL LICENSE</span>
-          <h2 className="text-xl sm:text-3xl font-bold uppercase text-white font-mono">Access Subscription</h2>
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider max-w-lg mx-auto">
-            A single premium licensing plan to unlock all realtime monitor tools.
-          </p>
-        </div>
-
-        {/* Central Pricing Card Preview */}
-        <div className="max-w-md mx-auto">
-          <div className="bg-[#0A0A0A] border-2 border-primary rounded p-6 shadow-[0_0_25px_rgba(94,234,212,0.08)] flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="space-y-2 border-b border-border pb-4 text-center">
-                <span className="text-[10px] text-primary block uppercase font-bold tracking-widest">SINGLE TIER LICENSE</span>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">PRO TERMINAL ACCESS</h3>
-                <div className="text-3xl font-black text-white">$49 <span className="text-[10px] text-muted-foreground font-normal lowercase">/ month</span></div>
-              </div>
-
-              <ul className="space-y-3 text-[10px] text-white uppercase tracking-wider">
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0 animate-pulse" /> Realtime Arbitrage Scanner
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Paper Trading Engine
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Live Portfolio Tracking
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Execution Feed Logs
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Risk Monitoring Shields
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Realtime Analytics
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary shrink-0" /> Multi-Exchange Monitoring
-                </li>
-              </ul>
+              {/* Live Metrics Strip */}
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.4 }}
+                className="grid grid-cols-3 gap-4 bg-white border border-[#e5e7eb] rounded-2xl p-4 shadow-sm"
+              >
+                <div className="space-y-1">
+                  <p className="text-[10px] text-[#6b7280] uppercase tracking-wider font-semibold">Avg. Latency</p>
+                  <p className="text-xl font-bold" style={{ color: '#f4a622' }}>{avgLatency}<span className="text-sm font-normal text-[#6b7280] ml-1">ms</span></p>
+                </div>
+                <div className="space-y-1 border-l border-[#e5e7eb] pl-4">
+                  <p className="text-[10px] text-[#6b7280] uppercase tracking-wider font-semibold">Ticks Analyzed</p>
+                  <p className="text-xl font-bold text-[#1f2937]">{ticksCount.toLocaleString()}</p>
+                </div>
+                <div className="space-y-1 border-l border-[#e5e7eb] pl-4">
+                  <p className="text-[10px] text-[#6b7280] uppercase tracking-wider font-semibold">Spread Range</p>
+                  <p className="text-xl font-bold text-emerald-600">+{opportunitySpread}%</p>
+                </div>
+              </motion.div>
             </div>
 
-            <Link 
-              to="/pricing" 
-              className="mt-8 block text-center w-full bg-primary hover:bg-primary/95 text-black font-bold text-[10px] py-3.5 rounded uppercase tracking-widest transition-all duration-300 shadow-[0_0_15px_rgba(94,234,212,0.2)]"
+            {/* Right: Dashboard Preview Card */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+              className="lg:col-span-6 relative"
             >
-              Unlock Terminal Access
-            </Link>
+              <div className="bg-white border border-[#e5e7eb] rounded-2xl shadow-xl overflow-hidden">
+                {/* Window bar */}
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e5e7eb] bg-[#f4f6f9]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-rose-400" />
+                    <div className="w-3 h-3 rounded-full bg-amber-400" />
+                    <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                  </div>
+                  <span className="text-xs font-semibold text-[#6b7280]">Arbitra — Live Feed Dashboard</span>
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live
+                  </div>
+                </div>
+
+                {/* Mock dashboard body */}
+                <div className="p-5 space-y-3">
+                  {/* Mini stat row */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Portfolio Value', value: '$42,910', color: '#1f2937' },
+                      { label: 'Total Trades',   value: '2,108',    color: '#f4a622'  },
+                      { label: 'Daily PnL',      value: '+$284.50', color: '#059669'  },
+                    ].map(s => (
+                      <div key={s.label} className="bg-[#f4f6f9] border border-[#e5e7eb] rounded-xl p-3">
+                        <p className="text-[9px] text-[#6b7280] uppercase tracking-wider font-semibold mb-1">{s.label}</p>
+                        <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Opportunity rows */}
+                  <div className="border border-[#e5e7eb] rounded-xl overflow-hidden">
+                    <div className="bg-[#f4f6f9] border-b border-[#e5e7eb] px-4 py-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Arbitrage Scanner</span>
+                      <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />8 opportunities
+                      </span>
+                    </div>
+                    {[
+                      { symbol: 'BTC/USDT', route: 'Binance → Bybit',  spread: '+1.64%', profit: '+$124.50', latency: '11ms' },
+                      { symbol: 'ETH/USDT', route: 'OKX → Kraken',     spread: '+0.95%', profit: '+$68.20',  latency: '14ms' },
+                      { symbol: 'SOL/USDT', route: 'Bybit → Binance',  spread: '+1.12%', profit: '+$41.80',  latency: '9ms'  },
+                    ].map((row, i) => (
+                      <div key={i} className="flex items-center justify-between px-4 py-2.5 border-b border-[#e5e7eb] last:border-0 text-xs hover:bg-[#f4f6f9] transition-colors">
+                        <span className="font-bold text-[#1f2937] w-20">{row.symbol}</span>
+                        <span className="text-[#6b7280] flex-1 flex items-center gap-1">
+                          {row.route.split(' → ')[0]}
+                          <ArrowRight className="w-3 h-3 opacity-40" />
+                          {row.route.split(' → ')[1]}
+                        </span>
+                        <span className="font-bold text-emerald-600 w-14 text-right">{row.spread}</span>
+                        <span className="font-bold text-emerald-600 w-20 text-right">{row.profit}</span>
+                        <span className="text-[#6b7280] w-10 text-right text-[10px]">{row.latency}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Exchange health mini */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Binance', 'Bybit', 'OKX'].map(ex => (
+                      <div key={ex} className="flex items-center gap-2 px-3 py-2 bg-[#f4f6f9] border border-[#e5e7eb] rounded-lg">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="text-[10px] font-semibold text-[#1f2937]">{ex}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating badge */}
+              <div className="absolute -bottom-3 -right-3 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#e5e7eb] shadow-lg text-xs font-bold text-[#143b63]">
+                <TrendingUp className="w-3.5 h-3.5 text-[#f4a622]" />
+                Paper Trading Platform
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER & DISCLAIMER */}
-      <footer className="bg-[#050505] border-t border-[#1A1A1A] py-12 text-muted-foreground font-mono text-[9px] uppercase tracking-widest leading-relaxed">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between border-b border-[#111] pb-6 gap-4">
-            <div className="flex items-center gap-2">
-              <Activity className="text-primary w-4 h-4" />
-              <span className="text-white text-xs font-bold font-mono">ARBITRA MONITOR TERMINAL</span>
-            </div>
-            <div className="flex gap-6 text-[10px]">
-              <button onClick={() => scrollToSection('features')} className="hover:text-primary transition-colors focus:outline-none">FEATURES</button>
-              <button onClick={() => scrollToSection('how-it-works')} className="hover:text-primary transition-colors focus:outline-none">HOW IT WORKS</button>
-              <button onClick={() => scrollToSection('pricing')} className="hover:text-primary transition-colors focus:outline-none">PRICING</button>
-            </div>
+      {/* ════════════════════════════════════════════════════════
+          TRUST BAR
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-8 border-y border-[#e5e7eb] bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
+            {[
+              { label: '14+ Exchanges',    icon: Globe },
+              { label: 'Sub-15ms Latency', icon: Zap   },
+              { label: 'Real-Time Spreads',icon: BarChart2 },
+              { label: 'Paper Trading',    icon: ShieldCheck },
+              { label: 'No API Keys Required', icon: Coins },
+            ].map(({ label, icon: Icon }) => (
+              <div key={label} className="flex items-center gap-2 text-sm font-semibold text-[#6b7280]">
+                <Icon className="w-4 h-4 text-[#f4a622]" />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          HOW IT WORKS
+      ════════════════════════════════════════════════════════ */}
+      <section id="how-it-works" className="py-20 bg-[#f4f6f9]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4"
+                  style={{ background: 'rgba(244,166,34,0.1)', color: '#f4a622' }}>
+              How It Works
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#1f2937] tracking-tight">From Scan to Insight in Seconds</h2>
+            <p className="text-[#6b7280] mt-3 text-sm max-w-lg mx-auto leading-relaxed">
+              Arbitra aggregates live exchange orderbooks and surfaces actionable arbitrage data through a clean, professional interface.
+            </p>
           </div>
 
-          {/* Legal Risk Disclaimers */}
-          <div className="space-y-3 font-mono text-[#666] leading-relaxed max-w-4xl">
-            <p>
-              <strong className="text-yellow-600">IMPORTANT NOTICE:</strong> ARBITRA IS A CRYPTOCURRENCY PRICE-DIFFERENCE MONITOR, LIVE MARKET TERMINAL, AND SIMULATED PAPER TRADING PLATFORM. ARBITRA IS NOT A REGISTERED FINANCIAL ADVISOR OR BROKER-DEALER.
-            </p>
-            <p>
-              ALL SYSTEMS IN THE DOCK AREA, THE EXECUTION FEED, AND BALANCE UPDATES REPRESENT PURELY MOCK PAPER RUNS. NO ACTUAL CRYPTOCURRENCY IS TRANSFERRED, SOLD, OR TRADED. ARBITRA DOES NOT ACCESS REAL COLD OR HOT EXCHANGE WALLETS, SECURE KEYS, OR TRADING PASSCODES.
-            </p>
-            <p>
-              PAST PERFORMANCE METRICS DO NOT GUARANTEE FUTURE RESULTS. ARBITRA DOES NOT MARKET GUARANTEED PROFITS OR CLAIM INVESTMENT GAINS. MONITORING CRYPTOCURRENCY PRICE OPPORTUNITIES CARRIES RISK, AND OPERATORS ASSUME ALL ACCOUNTABILITY REGARDING PRIVATE OPTIONS.
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                step: '01',
+                icon: Radar,
+                title: 'Continuous Price Monitoring',
+                desc: 'Real-time orderbooks across 14+ exchanges are scanned millisecond-by-millisecond to identify cross-exchange price differentials.',
+                cta: 'Real-time scan',
+              },
+              {
+                step: '02',
+                icon: ShieldCheck,
+                title: 'Exposure & Risk Simulation',
+                desc: 'Safeguards calculate expected slippage, order weights, and exposure limits before routing simulated paper trades.',
+                cta: 'Risk management',
+              },
+              {
+                step: '03',
+                icon: BarChart2,
+                title: 'Live Workspace Analytics',
+                desc: 'Executed paper trades sync instantly to your portfolio dashboard — balance charts, PnL metrics, and trade history.',
+                cta: 'Unified analytics',
+              },
+            ].map((card, i) => (
+              <motion.div
+                key={card.step}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+                className="bg-white border border-[#e5e7eb] rounded-2xl p-6 hover:shadow-lg hover:border-[#143b63]/20 transition-all duration-300 flex flex-col"
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                       style={{ background: '#143b63' }}>
+                    <card.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-3xl font-black text-[#e5e7eb]">{card.step}</span>
+                </div>
+                <h3 className="text-base font-bold text-[#1f2937] mb-2">{card.title}</h3>
+                <p className="text-sm text-[#6b7280] leading-relaxed flex-1">{card.desc}</p>
+                <div className="flex items-center gap-1.5 mt-5 text-xs font-bold" style={{ color: '#f4a622' }}>
+                  {card.cta} <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          FEATURES GRID
+      ════════════════════════════════════════════════════════ */}
+      <section id="features" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4"
+                  style={{ background: 'rgba(244,166,34,0.1)', color: '#f4a622' }}>
+              Platform Features
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#1f2937] tracking-tight">Everything You Need</h2>
+            <p className="text-[#6b7280] mt-3 text-sm max-w-lg mx-auto leading-relaxed">
+              Professional-grade monitoring and simulation tools designed for cryptocurrency arbitrage analysis.
             </p>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-[#111] text-[8px] text-[#444]">
-            <span>© 2026 ARBITRA GLOBAL CONSOLE, INC. ALL CODES SECURED.</span>
-            <span>UPLINK CONNECTION SYNC STATUS: SECURE</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <FeatureCard icon={Radar}       num="01" title="Arbitrage Spread Scanner"  desc="Continuously query orderbooks across major crypto venues. Filter and rank real-time opportunity spreads by profitability and latency." />
+            <FeatureCard icon={Cpu}         num="02" title="Paper Trading Engine"      desc="Initiate simulated orders across exchange proxies. Verify latency indicators, fills, spread payouts, and execution paths risk-free." />
+            <FeatureCard icon={Coins}       num="03" title="Live Portfolio Tracking"   desc="Monitor simulated asset allocations, virtual balances, and cumulative paper PnL updates across all connected exchange accounts." />
+            <FeatureCard icon={ShieldCheck} num="04" title="Exposure Risk Monitor"     desc="Protect strategies with automated slippage limits, max open trade thresholds, and real-time rejection reason telemetry." />
+            <FeatureCard icon={Activity}    num="05" title="Execution Feed Logs"       desc="Review structured trade history mapping execution latency, routing venues, profit per trade, and trade status in real time." />
+            <FeatureCard icon={Layers}      num="06" title="Multi-Exchange Health"     desc="Query status indicators and latency metrics across active exchanges simultaneously to identify optimal trading pathways." />
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          LOCKED PREVIEW
+      ════════════════════════════════════════════════════════ */}
+      <section id="previews" className="py-20 bg-[#f4f6f9]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4"
+                  style={{ background: 'rgba(20,59,99,0.08)', color: '#143b63' }}>
+              Workspace Previews
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#1f2937] tracking-tight">Pro Dashboard Access</h2>
+            <p className="text-[#6b7280] mt-3 text-sm max-w-lg mx-auto leading-relaxed">
+              Full workspace sections are unlocked with an active subscription.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Scanner preview */}
+            <div className="relative bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm group">
+              <div className="p-5 blur-sm pointer-events-none select-none">
+                <div className="border border-[#e5e7eb] rounded-xl overflow-hidden">
+                  <div className="bg-[#f4f6f9] border-b border-[#e5e7eb] px-4 py-2.5 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">Opportunity Scanner</span>
+                    <span className="text-xs font-semibold text-emerald-600">14 live</span>
+                  </div>
+                  {['BTC/USDT · Binance → Bybit · +1.64% · $124.50',
+                    'ETH/USDT · OKX → Kraken · +0.95% · $68.20',
+                    'SOL/USDT · Bybit → Binance · +1.12% · $41.80'].map((row, i) => (
+                    <div key={i} className="px-4 py-3 border-b border-[#e5e7eb] last:border-0 text-xs text-[#6b7280] flex items-center gap-3">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      {row}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/85 backdrop-blur-[1px]">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 shadow-sm" style={{ background: '#143b63' }}>
+                  <Lock className="w-5 h-5 text-white" />
+                </div>
+                <p className="font-bold text-sm text-[#1f2937] mb-1">Opportunity Scanner</p>
+                <p className="text-xs text-[#6b7280] mb-4">Active subscription required</p>
+                <Link to="/pricing"
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: '#f4a622' }}>
+                  Unlock Access
+                </Link>
+              </div>
+            </div>
+
+            {/* Analytics preview */}
+            <div className="relative bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm group">
+              <div className="p-5 blur-sm pointer-events-none select-none">
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {[['Net Balance', '$42,910 USDT'], ['Paper Trades', '2,108']].map(([l, v]) => (
+                    <div key={l} className="bg-[#f4f6f9] border border-[#e5e7eb] rounded-xl p-3">
+                      <p className="text-[10px] text-[#6b7280] uppercase tracking-wider font-semibold mb-1">{l}</p>
+                      <p className="text-base font-bold text-[#1f2937]">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="h-24 bg-[#f4f6f9] border border-[#e5e7eb] rounded-xl flex items-end px-3 pb-3 gap-1">
+                  {[40, 65, 45, 80, 60, 90, 70, 85, 55, 95, 75, 100].map((h, i) => (
+                    <div key={i} className="flex-1 rounded-sm" style={{ height: `${h * 0.7}%`, background: '#f4a622', opacity: 0.3 + i * 0.06 }} />
+                  ))}
+                </div>
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/85 backdrop-blur-[1px]">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 shadow-sm" style={{ background: '#143b63' }}>
+                  <Lock className="w-5 h-5 text-white" />
+                </div>
+                <p className="font-bold text-sm text-[#1f2937] mb-1">Trading Analytics</p>
+                <p className="text-xs text-[#6b7280] mb-4">Verify executions & balance charts</p>
+                <Link to="/pricing"
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: '#f4a622' }}>
+                  Unlock Access
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          PRICING
+      ════════════════════════════════════════════════════════ */}
+      <section id="pricing" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4"
+                  style={{ background: 'rgba(244,166,34,0.1)', color: '#f4a622' }}>
+              Pricing
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#1f2937] tracking-tight">Simple, Transparent Pricing</h2>
+            <p className="text-[#6b7280] mt-3 text-sm max-w-lg mx-auto leading-relaxed">
+              One professional plan — everything included, no hidden fees.
+            </p>
+          </div>
+
+          <div className="max-w-sm mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="bg-white border-2 rounded-2xl p-8 shadow-xl relative overflow-hidden"
+              style={{ borderColor: '#f4a622' }}
+            >
+              {/* Top accent */}
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: '#f4a622' }} />
+
+              <div className="text-center mb-6 pb-6 border-b border-[#e5e7eb]">
+                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3"
+                      style={{ background: 'rgba(244,166,34,0.1)', color: '#f4a622' }}>
+                  Pro Terminal
+                </span>
+                <div className="text-4xl font-black text-[#1f2937] mb-1">
+                  $49
+                  <span className="text-base font-normal text-[#6b7280] ml-1">/ month</span>
+                </div>
+                <p className="text-xs text-[#6b7280]">All features included · Cancel anytime</p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Realtime Arbitrage Scanner',
+                  'Paper Trading Engine',
+                  'Live Portfolio Tracking',
+                  'Execution Feed Logs',
+                  'Risk Monitoring Dashboard',
+                  'Multi-Exchange Health Monitor',
+                  'Real-time Analytics Charts',
+                ].map(f => (
+                  <li key={f} className="flex items-center gap-2.5 text-sm text-[#1f2937] font-medium">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                         style={{ background: 'rgba(244,166,34,0.15)' }}>
+                      <Check className="w-3 h-3 text-[#f4a622]" />
+                    </div>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <Link to="/pricing"
+                className="block w-full text-center py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 shadow-md"
+                style={{ background: '#f4a622' }}>
+                Start Pro Access
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          FOOTER
+      ════════════════════════════════════════════════════════ */}
+      <footer className="bg-[#143b63] text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 border-b border-white/10">
+            {/* Brand */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#f4a622]/20 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-[#f4a622]" />
+              </div>
+              <span className="font-bold text-base text-white">Arbitra</span>
+            </div>
+            {/* Links */}
+            <nav className="flex gap-6 text-sm font-medium text-slate-300">
+              <button onClick={() => scrollTo('features')}     className="hover:text-white transition-colors">Features</button>
+              <button onClick={() => scrollTo('how-it-works')} className="hover:text-white transition-colors">How It Works</button>
+              <button onClick={() => scrollTo('pricing')}      className="hover:text-white transition-colors">Pricing</button>
+            </nav>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="space-y-3 text-xs text-slate-400 leading-relaxed max-w-4xl">
+            <p>
+              <strong className="text-amber-400">Important Notice:</strong>{' '}
+              Arbitra is a cryptocurrency price-difference monitor, live market terminal, and simulated paper trading platform.
+              Arbitra is not a registered financial advisor or broker-dealer.
+            </p>
+            <p>
+              All systems, execution feeds, and balance updates represent purely mock paper runs.
+              No actual cryptocurrency is transferred, sold, or traded. Arbitra does not access real exchange wallets, private keys, or trading credentials.
+            </p>
+            <p>
+              Past performance metrics do not guarantee future results. Monitoring cryptocurrency price opportunities carries risk.
+              All operators assume full accountability regarding their private trading decisions.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-white/10 text-xs text-slate-500">
+            <span>© 2026 Arbitra. All rights reserved.</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              All systems operational
+            </span>
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
 
-// Minimal Check Icon
-function Check({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
+    </div>
   );
 }

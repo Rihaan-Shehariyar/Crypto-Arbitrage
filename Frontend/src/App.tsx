@@ -27,6 +27,8 @@ import Transactions from '@/pages/Transactions'
 import Opportunities from '@/pages/Opportunities'
 import Profile from '@/pages/Profile'
 import Login from '@/pages/Login'
+import Funding from '@/pages/Funding'
+
 
 // Admin pages and components
 import AdminLogin from '@/pages/admin/Login'
@@ -284,6 +286,11 @@ setUser(
                     <Route
                       path="/profile"
                       element={<Profile />}
+                    />
+
+                    <Route
+                      path="/funding"
+                      element={<Funding />}
                     />
 
                   </Routes>

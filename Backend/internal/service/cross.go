@@ -43,11 +43,11 @@ func unlock(key string) {
 // -----------------------------------
 
 const (
-	feeRate        = 0.001
-	slippageBuffer = 0.01
-	latencyBuffer  = 0.01
+	feeRate        = 0.0005
+	slippageBuffer = 0.001
+	latencyBuffer  = 0.001
 
-	minTradeValue = 10.0
+	minTradeValue = 5.0
 	maxCapital    = 50.0
 )
 
@@ -61,7 +61,7 @@ func handleCross(
 	userID string,
 	symbol string,
 ) {
-
+	
 	metrics.ArbitrageChecks.Inc()
 
 	metrics.WorkerQueueDepth.Set(
@@ -178,7 +178,7 @@ func handleCross(
 			// PROFITABLE?
 			// -----------------------------------
 
-			if netSpread <= 0 {
+			if netSpread <= -0.05 {
 
 				log.Printf(
 					"❌ SPREAD FAIL %s | %.4f%%",

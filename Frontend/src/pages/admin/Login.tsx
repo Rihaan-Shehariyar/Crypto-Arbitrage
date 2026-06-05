@@ -58,24 +58,18 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 selection:bg-primary/20">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 selection:bg-primary/20 font-sans">
       
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-
-      <Card className="w-full max-w-md border-border/80 bg-surface/50 backdrop-blur-lg relative overflow-hidden shadow-2xl">
+      <Card className="w-full max-w-md relative overflow-hidden shadow-sm bg-surface border border-border rounded-2xl">
         
-        {/* Glow border decoration */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-
         <CardHeader className="text-center pt-8 pb-6">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mb-3 shadow-[0_0_15px_rgba(94,234,212,0.15)]">
+          <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mb-3">
             <ShieldCheck className="text-primary w-7 h-7" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white font-sans tracking-tight">
+          <CardTitle className="text-2xl font-bold text-foreground tracking-tight">
             Administrator Gateway
           </CardTitle>
-          <CardDescription className="text-xs text-muted-foreground font-mono mt-1">
+          <CardDescription className="text-xs text-muted-foreground mt-1 font-medium">
             Access secure trading platform diagnostics
           </CardDescription>
         </CardHeader>
@@ -85,7 +79,7 @@ export function Login() {
             
             {/* EMAIL INPUT */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-mono font-semibold text-muted-foreground uppercase tracking-wider block">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                 Email Address
               </label>
               <div className="relative">
@@ -97,7 +91,7 @@ export function Login() {
                   placeholder="admin@arbitra.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 font-mono text-xs"
+                  className="pl-10 text-xs text-foreground bg-surface"
                   disabled={loading}
                 />
               </div>
@@ -105,7 +99,7 @@ export function Login() {
 
             {/* PASSWORD INPUT */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-mono font-semibold text-muted-foreground uppercase tracking-wider block">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                 Security Passcode
               </label>
               <div className="relative">
@@ -117,13 +111,13 @@ export function Login() {
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 font-mono text-xs"
+                  className="pl-10 pr-10 text-xs text-foreground bg-surface"
                   disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-white"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -133,7 +127,7 @@ export function Login() {
             {/* SUBMIT BUTTON */}
             <Button
               type="submit"
-              className="w-full mt-2 font-mono text-xs uppercase tracking-widest font-bold py-2.5 cursor-pointer"
+              className="w-full mt-2 text-xs uppercase tracking-widest font-bold py-2.5 bg-primary text-white hover:bg-primary/90 rounded-lg shadow-sm"
               disabled={loading}
             >
               {loading ? 'Authorizing...' : 'Authorize Login'}
@@ -141,15 +135,15 @@ export function Login() {
           </form>
 
           {/* CRITICAL INFO FOR AUDITORS / TESTERS */}
-          <div className="p-3.5 rounded-lg bg-black/40 border border-border/80 font-mono text-[10px] space-y-1">
-            <p className="text-primary font-bold uppercase tracking-wider">Demo Access Credentials</p>
-            <div className="text-muted-foreground flex justify-between">
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-border text-[11px] space-y-1.5 font-sans">
+            <p className="text-primary font-bold uppercase tracking-wider text-[10px]">Demo Access Credentials</p>
+            <div className="text-muted-foreground flex justify-between font-medium">
               <span>Email:</span>
-              <span className="text-white select-all">admin@arbitra.com</span>
+              <span className="text-foreground font-semibold select-all">admin@arbitra.com</span>
             </div>
-            <div className="text-muted-foreground flex justify-between">
+            <div className="text-muted-foreground flex justify-between font-medium">
               <span>Password:</span>
-              <span className="text-white select-all">admin123</span>
+              <span className="text-foreground font-semibold select-all">admin123</span>
             </div>
           </div>
 

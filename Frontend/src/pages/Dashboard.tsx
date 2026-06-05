@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Zap, Play, Square, Terminal } from 'lucide-react';
+import { ArrowUpRight, TrendingUp, Play, Square, Zap, BarChart2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPortfolio, startTrading, stopTrading } from '@/services/endpoints';
 import { useWebSocket } from '@/contexts/WebSocketContext';
@@ -13,18 +13,16 @@ import { toast } from 'sonner';
 import type { PortfolioResponse } from '@/types/api';
 
 const Skeleton = ({ className }: { className?: string }) => (
-  <div className={cn("animate-pulse bg-surface/80 rounded-md", className)} />
+  <div className={cn('animate-pulse bg-muted rounded-md', className)} />
 );
 
 export default function Dashboard() {
   const { isConnected } = useWebSocket();
   const { sessionStatus, tradingLoading, setTradingLoading, startSession, stopSession, tickDuration } = useSessionStore();
   const queryClient = useQueryClient();
-  
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      tickDuration();
-    }, 1000);
+    const interval = setInterval(() => tickDuration(), 1000);
     return () => clearInterval(interval);
   }, [tickDuration]);
 
@@ -65,190 +63,175 @@ export default function Dashboard() {
     }
   });
 
-  const handleStartTrading = () => {
-    if (window.confirm("CONFIRM SYSTEM ACTION: Initialize active trading execution engine?")) {
-      startMutation.mutate();
-    }
-  };
-
-  const handleStopTrading = () => {
-    if (window.confirm("CONFIRM SYSTEM ACTION: Shut down active trading execution engine?")) {
-      stopMutation.mutate();
-    }
-  };
-
   const isPending = tradingLoading || startMutation.isPending || stopMutation.isPending;
 
-  const formatBalance = (val: number) => {
-    const parts = val.toFixed(2).split('.');
-    return {
-      whole: Number(parts[0]).toLocaleString(),
-      decimal: '.' + parts[1]
-    };
-  };
+  const totalBalance = portfolio?.balances
+    ? Object.values(portfolio.balances).reduce((acc, exchange) =>
+        acc + Object.values(exchange ?? {}).reduce((s, b) => s + b, 0), 0)
+    : 0;
 
-  const totalBalance = portfolio?.balances ? Object.values(portfolio.balances).reduce((acc, exchange) => {
-    return acc + Object.values(exchange ?? {}).reduce((sum, bal) => sum + bal, 0);
-  }, 0) : 0;
-
-  const { whole, decimal } = formatBalance(totalBalance);
   const totalProfit = portfolio?.total_profit_usdt ?? portfolio?.summary?.total_profit_usdt ?? 0;
   const totalTrades = portfolio?.total_trades ?? portfolio?.summary?.total_trades ?? 0;
+  const balanceParts = totalBalance.toFixed(2).split('.');
 
   return (
-    <div className="space-y-4 pb-4 font-mono">
-      {/* Top Banner: Wallet & PnL Summary */}
-      <div className="border border-border bg-black/40 rounded-lg p-4 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-          <Zap className="w-32 h-32 text-primary" />
-        </div>
-        
-        <div className="z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">WALLET_CAPITAL_ALLOCATION</span>
-            <span className={cn(
-              "px-1 py-0.5 rounded text-[8px] border font-bold",
-              isConnected ? "border-primary/30 text-primary bg-primary/5" : "border-red-500/30 text-red-500 bg-red-500/5"
+    <div className="space-y-5 pb-6">
+
+      {/* ── TOP STATS ROW ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        {/* Balance */}
+        <div className="bg-surface border border-border shadow-card rounded-xl p-5 relative overflow-hidden col-span-1 sm:col-span-2">
+          <div className="absolute -right-4 -top-4 w-28 h-28 rounded-full opacity-[0.04] bg-primary pointer-events-none" />
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                Total Portfolio Balance
+              </p>
+              {isLoadingPortfolio ? (
+                <Skeleton className="h-9 w-40 mb-1" />
+              ) : (
+                <h2 className="text-3xl font-bold text-foreground tracking-tight">
+                  ${Number(balanceParts[0]).toLocaleString()}
+                  <span className="text-xl text-muted-foreground">.{balanceParts[1]}</span>
+                  <span className="text-sm text-muted-foreground font-normal ml-1.5">USDT</span>
+                </h2>
+              )}
+              <div className="flex items-center gap-1.5 mt-1.5 text-emerald-600 text-xs font-semibold">
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                {isLoadingPortfolio ? '…' : `+$${totalProfit.toFixed(2)} Est. PnL`}
+              </div>
+            </div>
+            <div className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border',
+              isConnected
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-rose-50   text-rose-700   border-rose-200'
             )}>
-              {isConnected ? "FEED_ONLINE" : "FEED_OFFLINE"}
-            </span>
-          </div>
-          {isLoadingPortfolio ? (
-            <Skeleton className="h-10 w-48 mb-1" />
-          ) : (
-            <h1 className="text-3xl font-bold tracking-tight text-white">
-              ${whole}<span className="text-muted-foreground text-xl">{decimal}</span>
-              <span className="text-xs text-muted-foreground ml-2 font-normal">USDT</span>
-            </h1>
-          )}
-          <div className="flex items-center text-primary font-medium text-xs mt-1">
-            <ArrowUpRight className="w-3.5 h-3.5 mr-0.5 shrink-0" />
-            <span>
-              {isLoadingPortfolio ? '...' : `+$${totalProfit.toFixed(2)} Today (Est. PnL)`}
-            </span>
+              <span className={cn('w-1.5 h-1.5 rounded-full', isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500')} />
+              {isConnected ? 'Feed Online' : 'Offline'}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-6 z-10 text-xs">
-          <div className="flex flex-col bg-black/20 p-2 border border-border/40 rounded min-w-[100px]">
-            <span className="text-[9px] text-muted-foreground">TOTAL_TRADES</span>
-            <span className="text-white font-bold text-sm mt-0.5">
-              {isLoadingPortfolio ? '...' : totalTrades}
-            </span>
+        {/* Stat: Total Trades */}
+        <div className="bg-surface border border-border shadow-card rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Trades</p>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart2 className="w-4 h-4 text-primary" />
+            </div>
           </div>
-          
-          <div className="flex flex-col bg-black/20 p-2 border border-border/40 rounded min-w-[100px]">
-            <span className="text-[9px] text-muted-foreground">SYSTEM_EFFICIENCY</span>
-            <span className="text-primary font-bold text-sm mt-0.5">99.87%</span>
-          </div>
+          {isLoadingPortfolio
+            ? <Skeleton className="h-7 w-16" />
+            : <p className="text-2xl font-bold text-foreground">{totalTrades}</p>}
+          <p className="text-[11px] text-muted-foreground mt-1">Executed arbitrage cycles</p>
+        </div>
 
-          <div className="flex flex-col bg-black/20 p-2 border border-border/40 rounded min-w-[100px]">
-            <span className="text-[9px] text-muted-foreground">LATENCY_SENSITIVITY</span>
-            <span className="text-white font-bold text-sm mt-0.5">&lt; 15ms</span>
+        {/* Stat: Efficiency */}
+        <div className="bg-surface border border-border shadow-card rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Efficiency</p>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
           </div>
+          <p className="text-2xl font-bold text-emerald-600">99.87%</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Uptime this session</p>
         </div>
       </div>
 
-      {/* Trading Engine Console Panel */}
-      <div className="border border-border bg-[#090909] rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center gap-4 relative overflow-hidden">
-        {/* Subtle decorative background pattern */}
-        <div className="absolute inset-y-0 right-0 w-64 bg-[linear-gradient(to_left,#111_1px,transparent_1px)] bg-[size:1rem_1rem] pointer-events-none opacity-30" />
-        
-        <div className="flex items-center gap-3.5 z-10 w-full sm:w-auto">
-          <div className="w-9 h-9 rounded bg-[#111] border border-border/60 flex items-center justify-center relative shrink-0">
-            <Terminal className="w-4 h-4 text-muted-foreground" />
+      {/* ── ENGINE CONTROL PANEL ────────────────────────────────────── */}
+      <div className="bg-surface border border-border shadow-card rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5 text-muted-foreground" />
             <span className={cn(
-              "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-black",
-              sessionStatus === 'ACTIVE'
-                ? "bg-primary animate-pulse"
-                : sessionStatus === 'STARTING' || sessionStatus === 'STOPPING'
-                ? "bg-yellow-500 animate-pulse"
-                : "bg-red-500"
+              'absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface',
+              sessionStatus === 'ACTIVE'                                     ? 'bg-emerald-500 animate-pulse' :
+              sessionStatus === 'STARTING' || sessionStatus === 'STOPPING'  ? 'bg-amber-400 animate-pulse' :
+              'bg-rose-500'
             )} />
           </div>
-          
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">TRADING EXECUTOR ENGINE</span>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="text-sm font-bold text-foreground">Trading Engine</p>
               <span className={cn(
-                "px-1.5 py-0.5 rounded text-[8px] font-bold border",
+                'px-1.5 py-0.5 rounded text-[10px] font-semibold border',
                 sessionStatus === 'ACTIVE'
-                  ? "border-primary/20 text-primary bg-primary/5"
-                  : "border-red-500/20 text-red-500 bg-red-500/5"
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-slate-100 text-muted-foreground border-border'
               )}>
-                {sessionStatus === 'ACTIVE' ? "LIVE_PARTICIPATION" : "OFFLINE_STANDBY"}
+                {sessionStatus === 'ACTIVE' ? 'Live Execution' : 'Standby'}
               </span>
             </div>
-            
-            <div className="flex items-center gap-1.5 font-bold">
-              <span className="text-xs text-muted-foreground uppercase">STATUS:</span>
-              <span className={cn(
-                "text-xs uppercase tracking-wider font-black",
-                sessionStatus === 'ACTIVE' 
-                  ? "text-primary shadow-[0_0_10px_rgba(94,234,212,0.2)]" 
-                  : sessionStatus === 'STARTING' || sessionStatus === 'STOPPING'
-                  ? "text-yellow-500"
-                  : "text-muted-foreground"
-              )}>
-                {sessionStatus === 'ACTIVE' ? 'TRADING ACTIVE' : `TRADING STOPPED (${sessionStatus === 'INACTIVE' ? 'STOPPED' : sessionStatus})`}
-              </span>
-            </div>
+            <p className={cn(
+              'text-xs font-semibold',
+              sessionStatus === 'ACTIVE'                                    ? 'text-emerald-600' :
+              sessionStatus === 'STARTING' || sessionStatus === 'STOPPING' ? 'text-amber-600'  :
+              'text-muted-foreground'
+            )}>
+              {sessionStatus === 'ACTIVE'
+                ? 'Trading Active — Scanning for opportunities'
+                : `Stopped (${sessionStatus})`}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto z-10 shrink-0">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            onClick={handleStartTrading}
+            onClick={() => { if (window.confirm('Initialize paper trading engine?')) startMutation.mutate(); }}
             disabled={isPending || sessionStatus === 'ACTIVE'}
             className={cn(
-              "flex-1 sm:flex-initial px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border flex items-center justify-center gap-1.5",
+              'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200',
               sessionStatus === 'ACTIVE'
-                ? "bg-primary/5 border-primary/20 text-primary/30 cursor-not-allowed"
-                : "bg-primary text-black border-primary hover:bg-primary/95 hover:shadow-[0_0_15px_rgba(94,234,212,0.25)]"
+                ? 'bg-muted text-muted-foreground border-border cursor-not-allowed'
+                : 'bg-primary text-white border-primary hover:bg-primary/90 shadow-sm cursor-pointer'
             )}
           >
-            <Play className="w-3.5 h-3.5 shrink-0" />
-            START TRADING
+            <Play className="w-4 h-4" />
+            Start Trading
           </button>
-          
           <button
-            onClick={handleStopTrading}
+            onClick={() => { if (window.confirm('Stop trading engine?')) stopMutation.mutate(); }}
             disabled={isPending || sessionStatus === 'INACTIVE'}
             className={cn(
-              "flex-1 sm:flex-initial px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border flex items-center justify-center gap-1.5",
+              'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200',
               sessionStatus === 'INACTIVE'
-                ? "bg-black/40 border-[#222] text-[#444] cursor-not-allowed"
-                : "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white"
+                ? 'bg-muted text-muted-foreground border-border cursor-not-allowed'
+                : 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600 shadow-sm cursor-pointer'
             )}
           >
-            <Square className="w-3.5 h-3.5 shrink-0" />
-            STOP TRADING
+            <Square className="w-4 h-4" />
+            Stop Trading
           </button>
         </div>
       </div>
 
-      {/* Main Grid Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 relative">
-        {/* Left Side: Realtime Charts & Live logs */}
+      {/* ── CHARTS + METRICS GRID ───────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Left: Charts */}
         <div className="lg:col-span-3 space-y-4">
-          <div className="h-[240px]">
+          <div className="h-[220px]">
             <OpportunitiesChart />
           </div>
-          <div className="h-[250px]">
+          <div className="h-[240px]">
             <TradeStream />
           </div>
         </div>
 
-        {/* Right Side: Risk & Exchange Metrics */}
+        {/* Right: Risk + Exchange */}
         <div className="space-y-4 lg:col-span-1">
-          <div className="h-[240px]">
+          <div className="h-[220px]">
             <RiskStatus />
           </div>
-          <div className="h-[280px]">
+          <div className="h-[268px]">
             <ExchangeHealth />
           </div>
         </div>
       </div>
+
     </div>
   );
 }
