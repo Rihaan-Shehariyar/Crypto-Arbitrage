@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, TrendingUp, Play, Square, Zap, BarChart2, Clock } from 'lucide-react';
+import { ArrowUpRight, TrendingUp, Play, Square, Zap, BarChart2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPortfolio, startTrading, stopTrading } from '@/services/endpoints';
 import { useWebSocket } from '@/contexts/WebSocketContext';

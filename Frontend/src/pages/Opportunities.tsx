@@ -143,7 +143,6 @@ export default function Opportunities() {
               const oppTime  = opp.timestamp ? new Date(opp.timestamp).getTime() : 0;
               const now      = Date.now();
               const ageMs    = oppTime > 0 ? now - oppTime : Infinity;
-              const ageSec   = ageMs !== Infinity ? (ageMs / 1000).toFixed(1) : 'N/A';
               const isNew    = ageMs < 1200;
               const isStale  = ageMs > 5000;
 

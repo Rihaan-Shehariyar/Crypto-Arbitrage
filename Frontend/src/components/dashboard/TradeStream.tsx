@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef} from 'react';
 import { useMetricsStore } from '@/store/useMetricsStore';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';

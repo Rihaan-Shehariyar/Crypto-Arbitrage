@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Key, Eye, EyeOff, Activity } from 'lucide-react';
+import { Eye, EyeOff, Activity } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { register, login } from '@/services/endpoints';
 import { toast } from 'sonner';

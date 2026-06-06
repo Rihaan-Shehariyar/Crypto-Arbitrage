@@ -13,7 +13,7 @@ export default function RiskStatus() {
   });
 
   const prevExposureRef = useRef<number>(0);
-  const [shouldPulse, setShouldPulse] = useState(false);
+  const [_, setShouldPulse] = useState(false);
 
   useEffect(() => {
     if (risk && risk.current_exposure !== undefined) {

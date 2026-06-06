@@ -79,23 +79,23 @@ export default function Profile() {
   if (!profile) return null;
 
   /* ── Info Row Component ── */
-  const InfoRow = ({
-    icon: Icon,
-    label,
-    children,
-  }: {
-    icon: React.ElementType;
-    label: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="flex items-start justify-between p-4 rounded-xl bg-background border border-border hover:border-primary/30 transition-colors">
-      <div className="flex items-center gap-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        <Icon className="w-3.5 h-3.5" />
-        {label}
-      </div>
-      <div className="text-right">{children}</div>
-    </div>
-  );
+  // const InfoRow = ({
+  //   icon: Icon,
+  //   label,
+  //   children,
+  // }: {
+  //   icon: React.ElementType;
+  //   label: string;
+  //   children: React.ReactNode;
+  // }) => (
+  //   <div className="flex items-start justify-between p-4 rounded-xl bg-background border border-border hover:border-primary/30 transition-colors">
+  //     <div className="flex items-center gap-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+  //       <Icon className="w-3.5 h-3.5" />
+  //       {label}
+  //     </div>
+  //     <div className="text-right">{children}</div>
+  //   </div>
+  // );
 
   return (
     <div className="max-w-2xl mx-auto pb-10">

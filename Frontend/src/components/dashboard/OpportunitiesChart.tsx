@@ -76,8 +76,7 @@ export default function OpportunitiesChart() {
                 itemStyle={{ color: '#f4a622', fontWeight: 600 }}
                 labelStyle={{ color: '#6b7280', fontWeight: 500 }}
                 labelFormatter={(label) => `Opportunity #${label}`}
-                formatter={(val: number) => [`${val}%`, 'Spread']}
-              />
+formatter={(val) => [`${val ?? 0}%`, 'Spread']}              />
               <Area
                 type="monotone"
                 dataKey="spread"
