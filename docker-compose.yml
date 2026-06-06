@@ -16,7 +16,7 @@ services:
       - "5173:5173"
 
     environment:
-      VITE_API_URL: http://13.63.245.187:8080
+      VITE_API_URL: https://arbitra.duckdns.org
 
     depends_on:
       - backend
@@ -67,7 +67,7 @@ services:
       GOOGLE_CLIENT_ID: 560044356850-lvlm99cng9i1lusi76dt882eb2b5cvjm.apps.googleusercontent.com
 
     
-      FRONTEND_ORIGIN: http://13.63.245.187:5173
+      FRONTEND_ORIGIN: https://arbitra.duckdns.org
 
     depends_on:
       postgres:
