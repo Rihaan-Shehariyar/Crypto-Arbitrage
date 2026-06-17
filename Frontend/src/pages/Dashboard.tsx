@@ -222,14 +222,10 @@ export default function Dashboard() {
         </div>
 
         {/* Right: Risk + Exchange */}
-        <div className="space-y-4 lg:col-span-1">
-          <div className="h-[220px]">
-            <RiskStatus />
-          </div>
-          <div className="h-[268px]">
-            <ExchangeHealth />
-          </div>
-        </div>
+      <div className="space-y-4 lg:col-span-1">
+  <RiskStatus />
+  <ExchangeHealth />
+</div>
       </div>
 
     </div>
