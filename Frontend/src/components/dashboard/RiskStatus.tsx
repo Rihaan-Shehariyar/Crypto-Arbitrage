@@ -130,7 +130,7 @@ export default function RiskStatus() {
           </div>
 
           {/* Last rejection */}
-          <div className="pt-2 border-t border-border">
+          <div className="mt-auto pt-2 border-t border-border">
             <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Last Rejection</p>
             <div className={cn(
               'w-full px-2.5 py-1.5 rounded-lg border text-[10px] font-bold text-center uppercase tracking-wider',
