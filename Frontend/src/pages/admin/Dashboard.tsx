@@ -6,7 +6,7 @@ import {
   Radio,
   Layers,
   AlertTriangle,
-  RefreshCw, k
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
